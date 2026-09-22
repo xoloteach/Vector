@@ -1,0 +1,39 @@
+# --- Godot ---
+# Derived import/shader cache. Hundreds of MB, never commit.
+game/.godot/
+game/android/
+*.translation
+
+# Godot editor-local overrides
+export_presets.local.cfg
+override.cfg
+
+# --- Blender ---
+*.blend1
+*.blend2
+blender/tmp/
+
+# --- build & capture artifacts ---
+# NOTE: exports/web/ IS committed on purpose — it is the deployable build.
+exports/tmp/
+captures/
+*.log
+*.tmp
+
+# --- toolchain downloads ---
+tools/bin/
+tools/downloads/
+node_modules/
+package-lock.json
+
+# --- python ---
+__pycache__/
+*.pyc
+.venv/
+
+# --- os / editor noise ---
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
