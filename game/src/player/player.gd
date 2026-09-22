@@ -18,6 +18,15 @@ signal landed(impact_speed: float, hard: bool)
 signal died(reason: String)
 signal state_changed(from: StringName, to: StringName)
 
+## Traversal events. Emitted by the states that perform each move, for animation,
+## audio and effects to hang off without polling the state machine.
+signal slid
+signal vaulted(high: bool)
+signal climbed(height: float)
+signal grabbed_ledge
+signal wall_ran
+signal rolled(impact_speed: float)
+
 @export var profile: MovementProfile
 
 ## The Z plane gameplay is locked to. Scenery lives in front of and behind it.
@@ -60,6 +69,8 @@ var controls_disabled: bool = false
 
 var _was_on_floor: bool = true
 var _turn_visual_target: float = 1.0
+var _collision_shape: CollisionShape3D
+var _body_height: float = 1.8
 
 ## True once the current jump's height has been trimmed by an early release, so
 ## the cut cannot compound across ticks.
@@ -79,6 +90,18 @@ func _ready() -> void:
 	add_child(input)
 
 	visual = get_node_or_null("Visual") as Node3D
+
+	_collision_shape = get_node_or_null("Collision") as CollisionShape3D
+	if _collision_shape == null:
+		push_error("Player is missing its Collision child.")
+	else:
+		# Duplicate the shape so resizing the capsule for a slide affects only this
+		# instance. Shapes are shared resources by default, and mutating a shared
+		# one would resize every body using it.
+		_collision_shape.shape = _collision_shape.shape.duplicate()
+		var capsule := _collision_shape.shape as CapsuleShape3D
+		if capsule != null:
+			_body_height = capsule.height
 
 	sensor = get_node_or_null("ParkourSensor") as ParkourSensor
 	if sensor == null:
@@ -264,6 +287,51 @@ func try_step_up() -> bool:
 func reset_fall_metrics() -> void:
 	peak_fall_speed = 0.0
 	fall_start_y = global_position.y
+
+
+# ------------------------------------------------------------- body dimensions
+
+## Standing capsule height. States that crouch the body restore to this.
+const STANDING_HEIGHT: float = 1.8
+## Body height while sliding. Low enough to clear a ~1 m duct.
+const SLIDING_HEIGHT: float = 0.85
+
+## Resizes the collision capsule, keeping its base pinned at the feet.
+##
+## Pinning the base rather than the centre matters: if the capsule shrank around
+## its centre the feet would lift off the floor, the runner would register as
+## airborne for a tick, and a slide would start with a spurious Fall transition.
+func set_body_height(height: float) -> void:
+	var shape := _collision_shape.shape as CapsuleShape3D
+	if shape == null:
+		return
+	# A capsule cannot be shorter than its own two hemispherical caps.
+	var clamped: float = maxf(height, shape.radius * 2.0 + 0.02)
+	shape.height = clamped
+	_collision_shape.position.y = clamped * 0.5
+	_body_height = clamped
+
+
+func body_height() -> float:
+	return _body_height
+
+
+## True when there is room to stand up again.
+##
+## Checked before leaving a slide, because restoring the capsule inside a duct
+## would push the runner through the ceiling or wedge it in place.
+func can_stand_up() -> bool:
+	if is_equal_approx(_body_height, STANDING_HEIGHT):
+		return true
+	var extra: float = STANDING_HEIGHT - _body_height
+	# Probe upward by the height we are about to regain, with a small margin.
+	return not test_move(global_transform, Vector3.UP * (extra + 0.05))
+
+
+## Moves the body directly, bypassing collision resolution. Used only by scripted
+## traversal states whose path the sensor has already verified as clear.
+func set_scripted_position(position: Vector3) -> void:
+	global_position = Vector3(position.x, position.y, plane_z)
 
 
 # ------------------------------------------------------------------- accessors

@@ -14,12 +14,13 @@ extends Node3D
 ## lets the probe fan scale with speed without churning the scene tree.
 
 enum Obstacle {
-	NONE,        ## clear ahead
-	STEP,        ## kerb height — absorbed by the run state, no dedicated move
-	LOW_VAULT,   ## hip height, thin — hurdle straight over without slowing
-	HIGH_VAULT,  ## chest height, thin — plant a hand and swing through
-	CLIMB,       ## head height or above, thick — mantle onto the top
-	WALL,        ## too tall to mantle — wall-run or kick off
+	NONE,         ## clear ahead
+	STEP,         ## kerb height — absorbed by the run state, no dedicated move
+	LOW_VAULT,    ## hip height, thin — hurdle straight over without slowing
+	HIGH_VAULT,   ## chest height, thin — plant a hand and swing through
+	CLIMB,        ## head height or above, thick — mantle onto the top
+	WALL,         ## too tall to mantle — wall-run or kick off
+	SLIDE_UNDER,  ## overhead obstruction with a passage beneath — go low
 }
 
 # ------------------------------------------------------------------- geometry
@@ -33,6 +34,16 @@ const PROBE_HEIGHTS: PackedFloat32Array = [0.18, 0.5, 0.9, 1.3, 1.65]
 ## Capsule dimensions, mirrored from the collision shape.
 const BODY_HEIGHT: float = 1.8
 const BODY_RADIUS: float = 0.34
+
+## Lowest forward-probe hit height that can still mean "overhead obstruction".
+## Sits above the sliding body height, so anything catching a lower probe is
+## something to vault or climb rather than duck under.
+const SLIDE_DETECT_MIN_HEIGHT: float = 1.0
+
+## Clearance needed under an obstruction to commit to sliding through it. The
+## sliding capsule is 0.85 m, and the margin covers the body bobbing over uneven
+## ground mid-slide — being wrong here wedges the runner inside geometry.
+const SLIDE_REQUIRED_CLEARANCE: float = 0.98
 
 # ------------------------------------------------------- classification limits
 
@@ -98,7 +109,12 @@ var far_side_height: float = 0.0
 var ceiling_clearance: float = INF
 
 ## True when a slide would fit under an obstruction the runner cannot stand in.
+## This is the *overhead* case — the runner is already beneath something.
 var can_slide_under: bool = false
+
+## Clearance beneath an obstruction detected ahead, INF when there is none. Set
+## when `obstacle` is `SLIDE_UNDER`.
+var overhead_clearance: float = INF
 
 ## Distance to a wall on the facing side, INF when none in reach.
 var wall_distance: float = INF
@@ -107,6 +123,16 @@ var wall_normal: Vector3 = Vector3.ZERO
 
 ## Height of solid ground below the feet, INF when airborne over nothing.
 var ground_distance: float = INF
+
+# ------------------------------------------------------------- ledge (airborne)
+
+## True when there is a grabbable ledge ahead: a lip whose top surface is within
+## reach of the runner's hands and which has clear space to pull onto.
+var ledge_available: bool = false
+## World position of the ledge's top-front corner.
+var ledge_point: Vector3 = Vector3.ZERO
+## Ledge top height relative to the runner's feet.
+var ledge_height: float = 0.0
 
 var _player: Player = null
 var _space: PhysicsDirectSpaceState3D = null
@@ -137,6 +163,7 @@ func poll() -> void:
 	_probe_gap(feet, dir)
 	_probe_obstacle(feet, dir)
 	_probe_wall(feet, dir)
+	_probe_ledge(feet, dir)
 
 	can_slide_under = (
 		ceiling_clearance < BODY_HEIGHT - 0.1
@@ -236,6 +263,7 @@ func _probe_obstacle(feet: Vector3, dir: float) -> void:
 	obstacle_depth = 0.0
 	obstacle_has_landing = false
 	obstacle_top = Vector3.ZERO
+	overhead_clearance = INF
 
 	var reach: float = base_reach + reach_per_speed * _player.horizontal_speed()
 
@@ -258,6 +286,29 @@ func _probe_obstacle(feet: Vector3, dir: float) -> void:
 		return  # nothing ahead
 
 	obstacle_distance = maxf(0.0, absf(face_x - feet.x) - BODY_RADIUS)
+
+	# --- overhead obstruction with a passage under it --------------------------
+	#
+	# Detected before anything else, because measuring it the usual way gets the
+	# answer backwards. An overhead duct's *top surface* is within mantling range, so
+	# the height-and-depth classification below cheerfully labels it CLIMB and the
+	# runner mantles onto a duct it was supposed to slide under.
+	#
+	# What distinguishes the two is not how tall the thing is but whether the space
+	# beneath it is passable, so that is what gets measured: the clearance under the
+	# obstruction's leading edge.
+	if lowest_hit_height > SLIDE_DETECT_MIN_HEIGHT:
+		var under_probe := Vector3(face_x + dir * 0.18, feet.y + 0.06, feet.z)
+		var under: Dictionary = _ray(under_probe, Vector3.UP * (BODY_HEIGHT + 0.5))
+		if not under.is_empty():
+			overhead_clearance = float(under["position"].y) - feet.y
+			var fits_sliding: bool = overhead_clearance >= SLIDE_REQUIRED_CLEARANCE
+			var blocks_standing: bool = overhead_clearance < BODY_HEIGHT + 0.05
+			if fits_sliding and blocks_standing:
+				obstacle = Obstacle.SLIDE_UNDER
+				obstacle_height = overhead_clearance
+				obstacle_has_landing = true
+				return
 
 	# Find the exact top surface: stand a probe just past the face and drop it.
 	var inset: float = dir * 0.12
@@ -310,6 +361,74 @@ func _classify(_highest_probe: float) -> Obstacle:
 	if h <= climb_max_height:
 		return Obstacle.CLIMB
 	return Obstacle.WALL
+
+
+@export_group("Ledge")
+## Lowest a ledge can be, relative to the feet, and still be worth grabbing.
+## Below this the runner would just land on it.
+@export var ledge_min_height: float = 0.55
+## Highest a ledge can be and still be within reach of the hands.
+@export var ledge_max_height: float = 2.15
+## How far ahead a ledge can be caught.
+@export var ledge_reach: float = 0.85
+## Clear space needed above the ledge to pull onto it.
+@export var ledge_headroom: float = 1.4
+
+
+## Looks for a ledge the runner could catch.
+##
+## This is the anti-frustration probe. A jump that falls slightly short of a roof
+## is the most common way to die in a game like this, and the difference between
+## "that was my fault" and "that was unfair" is usually whether the character even
+## tried to grab the edge it visibly touched. Catching the lip converts a large
+## share of near-misses into recoveries without making the jumps themselves easier.
+func _probe_ledge(feet: Vector3, dir: float) -> void:
+	ledge_available = false
+	ledge_point = Vector3.ZERO
+	ledge_height = 0.0
+
+	# March down the reachable band looking for a surface edge in front. Sampling
+	# several heights rather than one means a ledge is catchable across a range of
+	# approach trajectories instead of only at one exact altitude.
+	var samples: int = 6
+	for i: int in samples:
+		var h: float = lerpf(ledge_max_height, ledge_min_height, float(i) / float(samples - 1))
+		var probe_y: float = feet.y + h
+
+		# Is there solid geometry just ahead at this height?
+		var forward: Dictionary = _ray(
+			Vector3(feet.x, probe_y, feet.z),
+			Vector3(dir * (BODY_RADIUS + ledge_reach), 0.0, 0.0)
+		)
+		if forward.is_empty():
+			continue
+
+		var face_x: float = float(forward["position"].x)
+
+		# Find the top of it. Search only slightly above the hit, so a tall wall is
+		# rejected rather than reported as a ledge far overhead.
+		var above: Vector3 = Vector3(face_x + dir * 0.14, probe_y + 0.55, feet.z)
+		var top: Dictionary = _ray(above, Vector3.DOWN * 0.75)
+		if top.is_empty():
+			continue
+
+		var top_y: float = float(top["position"].y)
+		var height: float = top_y - feet.y
+		if height < ledge_min_height or height > ledge_max_height:
+			continue
+
+		# There must be room to stand once pulled up, or the grab is a trap.
+		var headroom: Dictionary = _ray(
+			Vector3(face_x + dir * 0.45, top_y + 0.1, feet.z),
+			Vector3.UP * ledge_headroom
+		)
+		if not headroom.is_empty():
+			continue
+
+		ledge_available = true
+		ledge_point = Vector3(face_x, top_y, feet.z)
+		ledge_height = height
+		return
 
 
 func _probe_wall(feet: Vector3, dir: float) -> void:

@@ -5,6 +5,108 @@ All notable progress, recorded per playable demo. Newest first.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 Every entry corresponds to a commit on `main` that produced a working build.
 
+## Demo 0.2 — parkour vocabulary — 2026-09-22
+
+The full movement set, chosen contextually. Course extended to 244 m and rebuilt
+to teach each move. Completed end to end by the autopilot in 23.1 s.
+
+### Added
+
+**Movement**
+- Six new states: `Slide`, `Vault` (low and high), `Climb` (mantle),
+  `LedgeGrab`, `WallRun`, `Roll`. One file each, all under 150 lines.
+- `TraversalPlanner` — the single place that decides *which* move an obstacle
+  calls for. States ask it; they never decide for themselves, so the same
+  obstacle produces the same decision whether the runner arrives on the ground or
+  out of the air. Priority is ranked by momentum preserved, and thresholds lean
+  toward *doing* the move, because vaulting something you meant to jump is a much
+  cheaper error than stopping dead at a crate.
+- `TraversalArc` — timed positional arcs for the scripted moves. The sensor has
+  already verified height, depth and landing space before one starts, so an
+  authored path gives the same clean action every time where a physics jump
+  varies with approach frame.
+- Sensor gained a `SLIDE_UNDER` obstacle class and a ledge probe.
+- Movement profile gained tuning groups for every new move.
+- Player can resize its collision capsule (pinned at the feet, so shrinking never
+  registers as leaving the ground) and refuses to stand up without headroom.
+- Six traversal signals for animation, audio and effects to hang off.
+
+**Feel**
+- **Roll** converts a heavy landing into a cheap one if the player goes low near
+  contact: ~92% speed kept versus ~45%. This is the justification for hard
+  landings existing at all — a landing penalty with no skilful counter is just a
+  tax on playing fast, which teaches players to avoid height.
+- **Slide-jump** cancels a slide at full speed.
+- **Ledge catch** converts near-miss jumps into recoveries without making any
+  jump easier. Hangs briefly then pulls up automatically — a hang with no timeout
+  is a state the player can sit in forever, and on touch it is not obvious what
+  to press.
+- **Wall run** is vertical, not lateral. Running along a wall does not exist in a
+  strict side view, and kicking off backwards sends the runner away from the goal.
+  An up-run trades horizontal momentum for height, so arriving fast is the answer
+  to obstacles too tall to mantle.
+
+**Animation** — `RunnerAnimator`, replacing the old placeholder
+- Every state declares a target pose; the rig *blends* toward it at a per-state
+  rate. Blend rates differ by move because one global rate cannot serve both: fast
+  enough for a vault to read as decisive makes a landing look twitchy.
+- Poses are authored so the **silhouette alone** identifies the action.
+- Three value steps inside the silhouette, so limb positions read against the
+  torso instead of merging into one rectangle.
+- This is the Phase 4 architecture, built against a placeholder mesh. Swapping in
+  a skinned Blender model replaces the rig construction; the state-to-pose mapping
+  and the blending survive.
+
+**Tooling**
+- `scripts/analyse_frame.py` — measures the value structure of a rendered frame
+  (banded luminance, histogram, near-black share). Visual critique kept stalling
+  on guesswork; this reports what actually reached the framebuffer. No Pillow
+  dependency — PNG decoding via `zlib`.
+- Shot harness can now capture **moves in progress**: a station places the runner
+  short of an obstacle, holds real input for a fixed tick count, then shoots. Still
+  deterministic, so these frames remain valid for regression comparison.
+
+### Fixed
+
+- **Every limb rotated about the wrong axis.** Joints rotated about X, which
+  swings a hanging limb along Z — into and out of the screen, where a side-view
+  camera cannot see it. Every pose rendered as a vertical stick with foreshortened
+  limbs: the vault, slide and hang were all authored with wide distinct
+  silhouettes and all three looked like a standing figure. It read as an animation
+  *quality* problem for two review cycles when it was an axis typo. Now Z
+  throughout, with a documented sign convention.
+- **The play surface was darker than its own background.** Measured: rooftop
+  ≈0.33 screen luminance against a backdrop ≈0.42. Exactly inverted for a
+  side-view game, and the reason the scene looked flat however the lighting was
+  adjusted. Retuned against measured targets — rooftop now ≈0.45 and the
+  brightest large area, backdrop 0.22–0.38, near-black share down from 4.5% to
+  0.9% so the runner's silhouette has that range to itself.
+- **Ducts were being mantled instead of slid under.** A duct's top surface sits
+  within mantling range, so height-based classification labelled it `CLIMB`. What
+  distinguishes the two is whether the space *beneath* is passable, so that is
+  what the sensor now measures.
+- **Stacked decks did not form flush walls.** `deck()` used a fixed thickness, so
+  a 3 m height change left a 1.9 m void with an overhang instead of a wall face.
+  The runner ran straight off into it and the wall-run beat was unreachable.
+- Fascia trim was a ~37 px near-black band across the bottom of every frame, and
+  anything low to the ground vanished into it.
+- Crate faces mirrored the dark sky at metallic 0.4, so one prop read as two
+  unrelated objects depending on the face.
+- Ledge hang sat too high — shoulders above the ledge being gripped.
+- Slide pose was anatomically closer to a real slide and completely unreadable at
+  ~20 px; readability now wins over accuracy.
+
+### Verified
+
+- Autopilot completes 244 m in 23.1 s with **every** state exercised:
+  Vault ×4, Slide ×5, Climb ×2, WallRun, LedgeGrab, Roll, 0 hard landings.
+- The bot only presses *right*, *jump at gaps*, and *slide when falling fast*.
+  Every vault, slide, mantle, wall run and ledge catch is chosen by the planner —
+  so the contextual system is genuinely doing the work, not being papered over by
+  plain jumping.
+- Browser build: 17 gameplay frames captured in Chromium/WebGL2, no page errors.
+- Touch controls: all 5 phone/tablet profiles pass.
+
 ## Touch controls + Pages hardening — 2026-09-22
 
 ### Added

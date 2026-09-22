@@ -120,15 +120,30 @@ func block(
 
 
 ## A walkable deck whose *top surface* sits at `top_y`, spanning `from_x`..`to_x`.
+##
 ## Authoring by top surface rather than centre matters because every gameplay
 ## decision — can I clear this, can I mantle that — is about surface height.
+##
+## ### `thickness` is a gameplay parameter, not a visual one
+##
+## A deck extends *down* from its top by `thickness`. For a deck with open air
+## underneath, the default is deliberately thin: the front face is a large flat
+## area pointed straight at the camera, and at 2 m it dominated the lower third of
+## every frame.
+##
+## But when a deck is meant to form a **flush riser or wall** against a lower deck,
+## its thickness must reach down to at least the lower deck's surface. Otherwise a
+## void opens up between the two, and what looks like a solid 3 m wall is actually a
+## gap with an overhang above it. That exact mistake made the wall-run beat
+## unreachable: the runner ran off the lower deck into the void and fell, because
+## there was no wall face in front of it to run up.
+##
+## Rule of thumb: for a riser, pass `thickness >= (top_y - lower_deck_top_y) + 0.2`.
 func deck(
 	from_x: float,
 	to_x: float,
 	top_y: float,
-	# Thin, because the front face of a deck is a large flat area pointed straight
-	# at the camera. At 2 m it dominated the lower third of every frame.
-	thickness: float = 1.1,
+	thickness: float = 0.85,
 	kind: SurfaceLibrary.Kind = SurfaceLibrary.Kind.CONCRETE
 ) -> BoxBlock:
 	var width: float = to_x - from_x

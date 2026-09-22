@@ -1,9 +1,9 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=20 format=3]
 
 [ext_resource type="Script" path="res://src/player/player.gd" id="s_player"]
 [ext_resource type="Script" path="res://src/player/state_machine.gd" id="s_machine"]
 [ext_resource type="Script" path="res://src/player/sensors/parkour_sensor.gd" id="s_sensor"]
-[ext_resource type="Script" path="res://src/player/placeholder_runner.gd" id="s_runner"]
+[ext_resource type="Script" path="res://src/player/runner_animator.gd" id="s_runner"]
 [ext_resource type="Script" path="res://src/player/states/idle_state.gd" id="s_idle"]
 [ext_resource type="Script" path="res://src/player/states/run_state.gd" id="s_run"]
 [ext_resource type="Script" path="res://src/player/states/jump_state.gd" id="s_jump"]
@@ -11,6 +11,12 @@
 [ext_resource type="Script" path="res://src/player/states/land_state.gd" id="s_land"]
 [ext_resource type="Script" path="res://src/player/states/hard_landing_state.gd" id="s_hard"]
 [ext_resource type="Script" path="res://src/player/states/death_state.gd" id="s_death"]
+[ext_resource type="Script" path="res://src/player/states/slide_state.gd" id="s_slide"]
+[ext_resource type="Script" path="res://src/player/states/vault_state.gd" id="s_vault"]
+[ext_resource type="Script" path="res://src/player/states/climb_state.gd" id="s_climb"]
+[ext_resource type="Script" path="res://src/player/states/ledge_grab_state.gd" id="s_ledge"]
+[ext_resource type="Script" path="res://src/player/states/wall_run_state.gd" id="s_wallrun"]
+[ext_resource type="Script" path="res://src/player/states/roll_state.gd" id="s_roll"]
 [ext_resource type="Resource" path="res://resources/default_movement.tres" id="r_profile"]
 
 [sub_resource type="CapsuleShape3D" id="cap_body"]
@@ -58,3 +64,21 @@ script = ExtResource("s_hard")
 
 [node name="Death" type="Node" parent="StateMachine"]
 script = ExtResource("s_death")
+
+[node name="Slide" type="Node" parent="StateMachine"]
+script = ExtResource("s_slide")
+
+[node name="Vault" type="Node" parent="StateMachine"]
+script = ExtResource("s_vault")
+
+[node name="Climb" type="Node" parent="StateMachine"]
+script = ExtResource("s_climb")
+
+[node name="LedgeGrab" type="Node" parent="StateMachine"]
+script = ExtResource("s_ledge")
+
+[node name="WallRun" type="Node" parent="StateMachine"]
+script = ExtResource("s_wallrun")
+
+[node name="Roll" type="Node" parent="StateMachine"]
+script = ExtResource("s_roll")

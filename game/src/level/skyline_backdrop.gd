@@ -28,11 +28,25 @@ extends Node3D
 ## distant objects *toward* the sky. Ramping that way puts the darkest values on
 ## the runner and the play geometry, where the player needs to look.
 ##
-## Nearest layer's mass colour. Must stay clearly lighter than the character
-## (~0.05 luminance) so the silhouette always separates from it.
-const NEAR_MASS: Color = Color(0.125, 0.145, 0.205)
+## --- Measured, not guessed ---------------------------------------------------
+##
+## These values were set against readings from `scripts/analyse_frame.py`, not by
+## eye. The first pass had the backdrop rendering at ~0.42 screen luminance while
+## the lit rooftop came out at ~0.33 — the play surface was *darker than its own
+## background*, which is the exact inverse of what a side-view game needs and why
+## the scene read as flat no matter how the lighting was adjusted.
+##
+## The target relationship, in screen luminance:
+##   runner        < 0.10   (must be the darkest thing in frame)
+##   near backdrop ~ 0.22
+##   far backdrop  ~ 0.38   (converging on haze)
+##   lit rooftop   ~ 0.58   (the brightest large area — where the player looks)
+##
+## Nearest layer's mass colour. Still clearly lighter than the runner, so the
+## silhouette separates, but now well below the play surface.
+const NEAR_MASS: Color = Color(0.072, 0.086, 0.13)
 ## Colour distant masses converge to. Tracks the sky horizon.
-const HAZE: Color = Color(0.46, 0.44, 0.50)
+const HAZE: Color = Color(0.29, 0.28, 0.335)
 
 ## Each layer: Z distance, size ranges, spacing, and `depth` — its 0..1 position
 ## along the near→haze ramp.

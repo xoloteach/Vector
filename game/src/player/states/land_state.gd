@@ -40,6 +40,15 @@ func physics_update(delta: float) -> void:
 		transition_to(FALL)
 		return
 
+	# Land straight into a traversal. Touching down a step away from a crate should
+	# vault it, not wait out the landing beat first — that pause is exactly where
+	# chained movement loses its rhythm.
+	var intent_slide: bool = player.input.slide_held or player.input.has_slide()
+	var action: StringName = TraversalPlanner.plan_grounded(player, intent_slide)
+	if action != TraversalPlanner.NONE:
+		transition_to(action)
+		return
+
 	if time_in_state() >= DURATION:
 		if is_zero_approx(axis) and player.horizontal_speed() < player.profile.idle_speed_threshold:
 			transition_to(IDLE)

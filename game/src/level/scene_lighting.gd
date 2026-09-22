@@ -41,7 +41,7 @@ extends Node3D
 	set(value):
 		key_color = value
 		_rebuild()
-@export var key_energy: float = 1.1:
+@export var key_energy: float = 1.3:
 	set(value):
 		key_energy = value
 		_rebuild()

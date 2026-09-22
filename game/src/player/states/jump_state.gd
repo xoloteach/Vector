@@ -42,3 +42,9 @@ func physics_update(delta: float) -> void:
 
 	if player.is_on_floor() and time_in_state() > TAKEOFF_GRACE:
 		resolve_landing()
+		return
+
+	# A jump straight into a tall wall becomes an up-run rather than a dead stop
+	# against its face.
+	if time_in_state() > TAKEOFF_GRACE:
+		resolve_airborne_traversal()

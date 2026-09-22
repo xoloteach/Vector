@@ -43,20 +43,27 @@ static func _build(kind: Kind) -> StandardMaterial3D:
 
 	match kind:
 		Kind.CONCRETE:
-			# Kept low so the lit rooftop lands mid-range rather than near-white.
-			# Walking surfaces are the brightest *gameplay* element, but they must
-			# not out-value the sky or the composition flattens.
-			mat.albedo_color = Color(0.185, 0.2, 0.235)
+			# The brightest large area in the frame, by design.
+			#
+			# Walking surfaces are what the player reads, so they get the top of the
+			# value range. Set against `scripts/analyse_frame.py` readings: an
+			# earlier value of 0.185 measured *darker* than the backdrop behind it,
+			# which flattened the whole composition.
+			mat.albedo_color = Color(0.3, 0.325, 0.37)
 			mat.roughness = 0.88
 			mat.metallic = 0.0
 		Kind.METAL:
 			# Props stay clearly lighter than the deck. That relationship is a
 			# gameplay cue — lighter than the floor means "this is furniture you
 			# interact with" — so it is maintained deliberately, not by eye.
-			mat.albedo_color = Color(0.355, 0.385, 0.435)
-			mat.roughness = 0.5
-			mat.metallic = 0.4
-			mat.metallic_specular = 0.55
+			mat.albedo_color = Color(0.44, 0.475, 0.53)
+			mat.roughness = 0.58
+			# Low metallic on purpose. At 0.4 the camera-facing faces of crates
+			# mirrored the dark sky and rendered near-black while their tops stayed
+			# pale, so the same prop read as two unrelated objects. Props have to look
+			# like one consistent, vaultable thing from every angle.
+			mat.metallic = 0.18
+			mat.metallic_specular = 0.45
 		Kind.PAINTED:
 			mat.albedo_color = Color(0.78, 0.46, 0.14)
 			mat.roughness = 0.62
@@ -66,7 +73,11 @@ static func _build(kind: Kind) -> StandardMaterial3D:
 			# structural mass. Never used behind the runner at body height: at this
 			# value it is as dark as the character and the silhouette disappears
 			# into it. Use TRIM for anything the runner passes in front of.
-			mat.albedo_color = Color(0.07, 0.082, 0.11)
+			#
+			# Lifted from 0.07: at that value a fascia was a near-black hole across
+			# the bottom of every frame, and anything low to the ground — a slide,
+			# a roll — vanished into it.
+			mat.albedo_color = Color(0.125, 0.14, 0.175)
 			mat.roughness = 0.95
 			mat.metallic = 0.0
 		Kind.TRIM:

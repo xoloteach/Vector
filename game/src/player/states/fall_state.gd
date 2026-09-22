@@ -26,3 +26,8 @@ func physics_update(delta: float) -> void:
 	# Late jump press, still inside the grace window.
 	if player.coyote_timer > 0.0 and player.input.has_jump():
 		transition_to(JUMP)
+		return
+
+	# Ledge catches and wall runs. Checked after the coyote jump so a late jump
+	# press is never swallowed by the runner deciding to grab something.
+	resolve_airborne_traversal()

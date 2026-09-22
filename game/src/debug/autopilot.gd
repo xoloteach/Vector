@@ -123,31 +123,61 @@ func _track_progress(delta: float) -> void:
 
 var _jump_down: bool = false
 var _jump_hold_remaining: float = 0.0
+var _slide_down: bool = false
 
 
-## The bot's whole brain: always run right, jump when the sensor says the ground
-## or a wall is about to interrupt that.
+## Falling faster than this, the bot goes low to convert the landing into a roll.
+@export var roll_arm_fall_speed: float = 20.0
+
+## The bot's whole brain — deliberately almost empty.
+##
+## It runs right, jumps at gaps, and goes low when falling hard. It does **not**
+## decide to vault, slide, mantle, wall-run or catch ledges; those have to be chosen
+## by `TraversalPlanner` from the same sensor data a player would be reacting to.
+##
+## That restriction is the test. Earlier versions of this bot also jumped at any
+## obstacle taller than a step, which meant plain jumping could paper over a
+## contextual system that did not work. Now, if the course completes, the traversal
+## system genuinely handles obstacles on its own; if the bot stalls at a crate, it
+## does not. The level is built with geometry for every move precisely so this
+## check has teeth.
 func _drive() -> void:
 	# Held continuously. Edge-triggering is unnecessary for an axis.
 	Input.action_press(&"move_right")
 
 	var sensor: ParkourSensor = _player.sensor
-	var want_jump: bool = false
 
-	if _player.is_on_floor():
-		# Gap ahead, and a real gap rather than a block seam.
-		if sensor.edge_distance <= edge_jump_margin and sensor.gap_width >= min_gap_to_jump:
-			want_jump = true
-		# Something to clear that is taller than a step.
-		elif (
-			sensor.obstacle != ParkourSensor.Obstacle.NONE
-			and sensor.obstacle != ParkourSensor.Obstacle.STEP
-			and sensor.obstacle_distance <= obstacle_jump_margin
-			and sensor.obstacle_height > _player.profile.step_up_height
-		):
-			want_jump = true
+	# Something tall dead ahead is the traversal system's problem, not a gap. Without
+	# this check the bot jumps at flush risers and walls, because the downward edge
+	# march sees no floor beyond them and reports a bottomless gap — and a jump into
+	# a wall face kills the horizontal speed that the mantle and wall-run both need.
+	var obstacle_ahead: bool = (
+		(
+			sensor.obstacle == ParkourSensor.Obstacle.CLIMB
+			or sensor.obstacle == ParkourSensor.Obstacle.WALL
+		)
+		and sensor.obstacle_distance <= 2.0
+	)
 
+	# Gaps are the player's job, so they are the bot's job. A real gap, not a seam
+	# between two adjacent blocks.
+	var want_jump: bool = (
+		_player.is_on_floor()
+		and not obstacle_ahead
+		and sensor.edge_distance <= edge_jump_margin
+		and sensor.gap_width >= min_gap_to_jump
+	)
 	_drive_jump_key(want_jump)
+
+	# Arm a roll on a heavy descent. Timing an input to an impact is a skill the
+	# game asks of the player, so the bot has to demonstrate it is achievable.
+	var want_low: bool = not _player.is_on_floor() and _player.velocity.y < -roll_arm_fall_speed
+	if want_low and not _slide_down:
+		Input.action_press(&"slide")
+		_slide_down = true
+	elif not want_low and _slide_down:
+		Input.action_release(&"slide")
+		_slide_down = false
 
 
 ## Presses jump on the rising edge only, then holds for `jump_hold_time`.
@@ -205,6 +235,9 @@ func _report(success: bool, summary: String) -> void:
 	_done = true
 	Input.action_release(&"move_right")
 	Input.action_release(&"jump")
+	Input.action_release(&"slide")
+	_jump_down = false
+	_slide_down = false
 
 	var course_length: float = _level.course_length if _level != null else 0.0
 	var report: Dictionary = {
