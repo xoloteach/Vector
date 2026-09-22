@@ -34,6 +34,12 @@ func _ready() -> void:
 
 	_bot = Autopilot.new()
 	_bot.name = "Autopilot"
+	# `--stall` runs the fairness counter-test: stand still and verify the pursuer
+	# actually catches you. A chase that cannot kill is scenery, and that failure is
+	# silent — the normal run passes either way.
+	_bot.stall_test = OS.get_cmdline_user_args().has("--stall")
+	if _bot.stall_test:
+		print("mode: STALL TEST (expects to be caught)")
 	add_child(_bot)
 	_bot.finished.connect(_on_finished)
 	_bot.setup(_level.player, _level)
@@ -52,6 +58,13 @@ func _on_finished(report: Dictionary) -> void:
 	print("hard landings: %d" % report["hard_landings"])
 	var fps: float = report["min_fps"]
 	print("min fps      : %s" % ("n/a (headless)" if fps == INF else "%.0f" % fps))
+
+	var closest: float = report["chase_min_distance"]
+	if closest < INF:
+		print("chase gap    : %.1f m closest, %.1f m furthest" % [
+			closest, report["chase_max_distance"]
+		])
+		print("chase peak   : %.2f intensity" % report["chase_peak_intensity"])
 	print("states       : %s" % _format_states(report["states"]))
 	print("")
 

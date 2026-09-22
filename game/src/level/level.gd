@@ -46,6 +46,12 @@ const PROP_BACK_Z: float = -1.9
 @export var camera: ParkourCamera
 @export var spawn_point: Marker3D
 
+## Whether this level runs a chase. Off for test courses.
+@export var chase_enabled: bool = true
+
+var director: ChaseDirector
+var pursuer: Pursuer
+
 ## X position of the finish line, filled in by `build_course()`.
 var course_length: float = 0.0
 
@@ -69,6 +75,8 @@ func _ready() -> void:
 		if spawn_point != null:
 			player.global_position = spawn_point.global_position
 		player.died.connect(_on_player_died)
+		if chase_enabled:
+			_start_chase()
 
 	if camera != null:
 		camera.snap_to_target()
@@ -319,6 +327,28 @@ func _add_void_killzone() -> void:
 	void_zone.size = Vector3(span, 8.0, 40.0)
 	void_zone.position = Vector3(span * 0.5 - 100.0, -18.0, 0.0)
 	spawn(void_zone)
+
+
+## Spawns the pursuer and its director.
+##
+## Created in code rather than placed in the scene so the chase can be switched off
+## per level with a single flag, and so the pursuer always starts relative to
+## wherever the runner actually spawned.
+func _start_chase() -> void:
+	director = ChaseDirector.new()
+	director.name = "ChaseDirector"
+	add_child(director)
+	director.setup(player)
+
+	pursuer = Pursuer.new()
+	pursuer.name = "Pursuer"
+	add_child(pursuer)
+	pursuer.setup(player, director)
+
+	# The camera widens and re-centres as pressure rises, so the pursuer stays in
+	# frame instead of sitting off the left edge exactly when it matters most.
+	if camera != null:
+		director.intensity_changed.connect(camera.set_threat)
 
 
 func _on_player_died(_reason: String) -> void:

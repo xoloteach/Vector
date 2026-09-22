@@ -55,6 +55,19 @@ var _stuck_for: float = 0.0
 var _last_x: float = -INF
 var _min_fps: float = INF
 
+## Chase telemetry. Recorded so the fairness contract is *measured* rather than
+## assumed: a competent run must keep the pursuer at arm's length the whole way.
+var _chase_min_distance: float = INF
+var _chase_max_distance: float = 0.0
+var _chase_peak_intensity: float = 0.0
+
+## When true the bot deliberately stands still, to verify the chase can actually
+## kill. A pursuer that never catches anyone is scenery.
+@export var stall_test: bool = false
+## How long to run before stalling, so the drone is at its normal trailing distance
+## when the test begins.
+@export var stall_after: float = 4.0
+
 
 func setup(player: Player, level: Level) -> void:
 	_player = player
@@ -78,6 +91,18 @@ func _physics_process(delta: float) -> void:
 	_elapsed += delta
 	_since_log += delta
 
+	_track_chase()
+
+	# Stall test: stop dead and let the pursuer close. Softlock detection has to be
+	# suspended, because standing still is the whole point of the test.
+	if stall_test and _elapsed >= stall_after:
+		Input.action_release(&"move_right")
+		Input.action_release(&"jump")
+		_jump_down = false
+		if _elapsed >= timeout_seconds:
+			_report(false, "stall test: never caught after %.1fs" % _elapsed)
+		return
+
 	_track_progress(delta)
 
 	if _elapsed >= timeout_seconds:
@@ -89,6 +114,15 @@ func _physics_process(delta: float) -> void:
 	if _since_log >= log_interval:
 		_since_log = 0.0
 		_log_line()
+
+
+func _track_chase() -> void:
+	if _level == null or _level.pursuer == null or _level.director == null:
+		return
+	var distance: float = _player.global_position.x - _level.pursuer.global_position.x
+	_chase_min_distance = minf(_chase_min_distance, distance)
+	_chase_max_distance = maxf(_chase_max_distance, distance)
+	_chase_peak_intensity = maxf(_chase_peak_intensity, _level.director.intensity())
 
 
 func _track_progress(delta: float) -> void:
@@ -220,6 +254,12 @@ func _fmt(value: float) -> String:
 # ------------------------------------------------------------------- conclusions
 
 func _on_died(reason: String) -> void:
+	# In a stall test, being caught *is* the pass condition.
+	if stall_test and reason == Game.FAIL_CAUGHT:
+		_report(true, "stall test: caught after %.1fs of standing still" % (
+			_elapsed - stall_after
+		))
+		return
 	_report(false, "died (%s) at x=%.1f y=%.1f" % [
 		reason, _player.global_position.x, _player.global_position.y
 	])
@@ -251,5 +291,9 @@ func _report(success: bool, summary: String) -> void:
 		"hard_landings": _hard_landings,
 		"min_fps": _min_fps,
 		"states": _states_seen,
+		"chase_min_distance": _chase_min_distance,
+		"chase_max_distance": _chase_max_distance,
+		"chase_peak_intensity": _chase_peak_intensity,
+		"stall_test": stall_test,
 	}
 	finished.emit(report)

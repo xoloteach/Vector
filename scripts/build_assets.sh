@@ -40,6 +40,24 @@ grep -E '^\[build_runner\]' "$LOG" | sed 's/^/  /'
 [ -s "$CHAR_DIR/runner.glb" ] || die "runner.glb was not written"
 ok "runner.glb  $(du -h "$CHAR_DIR/runner.glb" | cut -f1)"
 
+# --- pursuer drone ------------------------------------------------------------
+step "Building pursuer drone"
+DRONE_LOG="$LOG_DIR/build_drone.log"
+set +e
+blender --background --factory-startup \
+  --python "$REPO_ROOT/blender/scripts/build_drone.py" \
+  -- --out "$CHAR_DIR" >"$DRONE_LOG" 2>&1
+drone_status=$?
+set -e
+
+if ! grep -q '^BUILD_DRONE: DONE' "$DRONE_LOG"; then
+  tail -40 "$DRONE_LOG" >&2
+  die "drone build failed (exit $drone_status) — see $DRONE_LOG"
+fi
+grep -E '^\[build_drone\]' "$DRONE_LOG" | sed 's/^/  /'
+[ -s "$CHAR_DIR/drone.glb" ] || die "drone.glb was not written"
+ok "drone.glb  $(du -h "$CHAR_DIR/drone.glb" | cut -f1)"
+
 # --- environment kit ----------------------------------------------------------
 PROP_DIR="$GAME_DIR/assets/props"
 mkdir -p "$PROP_DIR"

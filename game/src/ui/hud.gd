@@ -16,6 +16,8 @@ const MARGIN: int = 22
 const ACCENT: Color = Color(0.94, 0.62, 0.22)
 const INK: Color = Color(0.93, 0.95, 0.98)
 const DIM: Color = Color(0.62, 0.67, 0.76)
+const THREAT_CALM: Color = Color(0.45, 0.55, 0.68)
+const THREAT_DANGER: Color = Color(0.92, 0.32, 0.22)
 
 var _timer_label: Label
 var _speed_bar: ProgressBar
@@ -23,6 +25,10 @@ var _progress_bar: ProgressBar
 var _meters: VBoxContainer
 var _state_label: Label
 var _rotate_hint: Label
+var _threat_box: VBoxContainer
+var _threat_bar: ProgressBar
+var _threat_label: Label
+var _threat_fill: StyleBoxFlat
 var _touch_mode: bool = false
 var _banner: PanelContainer
 var _banner_title: Label
@@ -52,6 +58,12 @@ func _ready() -> void:
 func bind(player: Player, level: Level) -> void:
 	_player = player
 	_level = level
+
+	# The threat meter only exists when something is actually chasing. A permanent
+	# alarm on a calm run devalues the cue.
+	if _level != null and _level.director != null:
+		_threat_box.visible = true
+		_level.director.danger_changed.connect(_on_danger_changed)
 
 
 # ------------------------------------------------------------------ construction
@@ -106,6 +118,39 @@ func _build_bottom() -> void:
 	_progress_bar = _make_bar(Color(0.45, 0.78, 0.92))
 	box.add_child(_progress_bar)
 
+	# Threat meter. Bottom-centre rather than in the corner cluster, because unlike
+	# speed and route this is information the player must react to, and it needs to
+	# be inside the area their eyes already cover. Hidden entirely when nothing is
+	# chasing, so a calm run has no permanent alarm on screen.
+	_threat_box = VBoxContainer.new()
+	_threat_box.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_threat_box.anchor_left = 0.5
+	_threat_box.anchor_right = 0.5
+	_threat_box.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_threat_box.offset_top = -54
+	_threat_box.custom_minimum_size = Vector2(240, 0)
+	_threat_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	_threat_box.add_theme_constant_override("separation", 3)
+	_threat_box.visible = false
+	add_child(_threat_box)
+
+	_threat_label = Label.new()
+	_threat_label.text = "PURSUIT"
+	_threat_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_threat_label.add_theme_font_size_override("font_size", 11)
+	_threat_label.add_theme_color_override("font_color", DIM)
+	_threat_box.add_child(_threat_label)
+
+	_threat_bar = _make_bar(THREAT_CALM)
+	_threat_bar.custom_minimum_size = Vector2(240, 6)
+	_threat_fill = _last_fill_style
+	_threat_box.add_child(_threat_bar)
+
+
+## Keeps a reference to the last fill stylebox created, so the threat bar can
+## recolour itself as danger rises.
+var _last_fill_style: StyleBoxFlat
+
 
 func _make_bar(fill: Color) -> ProgressBar:
 	var bar := ProgressBar.new()
@@ -130,6 +175,7 @@ func _make_bar(fill: Color) -> ProgressBar:
 	fg.corner_radius_bottom_left = 3
 	fg.corner_radius_bottom_right = 3
 	bar.add_theme_stylebox_override("fill", fg)
+	_last_fill_style = fg
 	return bar
 
 
@@ -240,6 +286,14 @@ func _process(_delta: float) -> void:
 	if _level != null and _level.course_length > 0.0:
 		_progress_bar.value = clampf(_player.global_position.x / _level.course_length, 0.0, 1.0)
 
+	if _level != null and _level.director != null and _threat_box.visible:
+		var intensity: float = _level.director.intensity()
+		_threat_bar.value = intensity
+		# Colour carries the same information as length, so the cue survives being
+		# seen only out of the corner of the eye.
+		if _threat_fill != null:
+			_threat_fill.bg_color = THREAT_CALM.lerp(THREAT_DANGER, intensity)
+
 	if _debug_visible:
 		_state_label.text = _debug_text()
 
@@ -289,6 +343,13 @@ func set_touch_mode(active: bool) -> void:
 
 
 # ------------------------------------------------------------------------ events
+
+func _on_danger_changed(in_danger: bool) -> void:
+	_threat_label.text = "PURSUIT — CLOSE" if in_danger else "PURSUIT"
+	_threat_label.add_theme_color_override(
+		"font_color", THREAT_DANGER if in_danger else DIM
+	)
+
 
 func _on_run_started() -> void:
 	_banner.visible = false

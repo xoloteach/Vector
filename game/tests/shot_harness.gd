@@ -47,6 +47,16 @@ const STATIONS: Array[Dictionary] = [
 	{"name": "m6-ledge-grab", "x": 164.0, "y": 0.1, "hold": ["move_right"], "ticks": 58},
 	{"name": "m7-airborne", "x": 30.0, "y": 0.6, "hold": ["move_right", "jump"], "ticks": 32},
 	{"name": "m8-roll", "x": 216.0, "y": 3.1, "hold": ["move_right", "slide"], "ticks": 96},
+	# The pursuer, placed explicitly. `drone_offset` is how far behind the runner to
+	# park it.
+	#
+	# It cannot be photographed by simply waiting: during normal play the drone trails
+	# outside the frame, and letting it close means it catches the runner and ends the
+	# run. Placing it directly is the only way to get a repeatable image of the chase
+	# at a chosen distance — which is also exactly what reviewing the *readability* of
+	# the threat requires.
+	{"name": "n1-pursuer-far", "x": 20.0, "y": 0.6, "drone_offset": 13.0},
+	{"name": "n2-pursuer-close", "x": 20.0, "y": 0.6, "drone_offset": 5.5},
 ]
 
 const LEVEL_PATH: String = "res://scenes/levels/level_01.tscn"
@@ -92,6 +102,7 @@ func _shoot_all() -> void:
 		var hold: Array = station.get("hold", [])
 
 		_reset_player(player, station["x"], station["y"])
+		_place_drone(player, station.get("drone_offset", -1.0))
 
 		if ticks > 0:
 			for action: String in hold:
@@ -132,11 +143,40 @@ func _shoot_all() -> void:
 	get_tree().call_deferred("quit", 0)
 
 
+## Parks the pursuer a fixed distance behind the runner, or well out of frame when
+## the station does not want it.
+##
+## Out of frame by default because most stations exist to judge geometry and poses,
+## and a drone wandering through those shots would make them non-comparable between
+## runs.
+func _place_drone(player: Player, offset: float) -> void:
+	if _level.pursuer == null:
+		return
+	var behind: float = offset if offset > 0.0 else 400.0
+	# Feed the camera the intensity this distance would produce, so chase framing is
+	# exercised rather than merely the drone being present.
+	if _level.camera != null and _level.director != null:
+		_level.director.report_distance(behind)
+		_level.camera.set_threat(_level.director.intensity())
+	_level.pursuer.global_position = Vector3(
+		player.global_position.x - behind,
+		player.global_position.y + _level.pursuer.hover_height,
+		player.plane_z
+	)
+
+
 ## Puts the runner back to a known state between stations, so one station's leftover
 ## velocity or crouched capsule cannot contaminate the next.
+##
+## Also restarts the run: earlier stations legitimately end in death (the runner is
+## dropped into place and falls), which deactivates the chase director for every
+## station after it. Without the reset, half the sheet silently had no pursuer.
 func _reset_player(player: Player, x: float, y: float) -> void:
 	for action: String in ["move_right", "move_left", "jump", "slide"]:
 		Input.action_release(StringName(action))
+	player.is_dead = false
+	player.input.lock(0.0)
+	Game.start_run()
 	player.set_body_height(Player.STANDING_HEIGHT)
 	player.global_position = Vector3(x, y, player.plane_z)
 	player.velocity = Vector3.ZERO

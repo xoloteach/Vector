@@ -34,4 +34,23 @@ else
 fi
 
 assert_no_godot_errors "$LOG"
-printf '\n%sGameplay test passed.%s\n' "$C_GREEN$C_BOLD" "$C_OFF"
+
+# --- chase fairness counter-test ---------------------------------------------
+# The run above proves a competent player escapes the pursuer. That is only half the
+# contract: a pursuer that can *never* catch anyone is scenery, and nothing in the
+# normal run would reveal it. This stands still and requires a catch.
+step "Running chase fairness counter-test (stall)"
+STALL_LOG="$LOG_DIR/autopilot_stall.log"
+set +e
+timeout 180 "$GODOT" --headless --path "$GAME_DIR" \
+  res://tests/autopilot_harness.tscn -- --stall 2>&1 | tee "$STALL_LOG" \
+  | grep -E '^(mode|outcome|summary|chase)' 
+set -e
+
+if grep -q '^AUTOPILOT: PASS' "$STALL_LOG"; then
+  ok "a stalled runner is caught — the chase has teeth"
+else
+  die "stall test failed: the pursuer never caught a stationary runner. See $STALL_LOG"
+fi
+
+printf '\n%sGameplay tests passed.%s\n' "$C_GREEN$C_BOLD" "$C_OFF"

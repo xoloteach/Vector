@@ -5,6 +5,77 @@ All notable progress, recorded per playable demo. Newest first.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 Every entry corresponds to a commit on `main` that produced a working build.
 
+## Demo 0.5 — chase system — 2026-09-22
+
+Something is behind you now.
+
+### Added
+
+- `blender/scripts/build_drone.py` — an original autonomous security drone.
+  760 triangles, 32 KB. Flattened delta hull, two pairs of shrouded rotor pods
+  (exported as separate nodes so they spin), one forward sensor eye, ventral
+  antenna rake.
+- `ChaseDirector` — decides how much pressure applies, moment to moment. Separate
+  from the drone because "how fast should the pursuer be going" and "how does a
+  pursuer move" are different problems, and mixing them is how chase AI becomes
+  untunable.
+- `Pursuer` — motion and presentation. Samples the terrain below itself and hovers
+  above it; rotors spin faster under load, the hull banks into acceleration, and the
+  sensor eye's pulse rate tracks threat.
+- Chase-responsive camera: the view widens and the runner re-centres as pressure
+  rises.
+- HUD threat meter, bottom-centre, hidden entirely when nothing is chasing.
+- Autopilot now records chase telemetry, and has a **stall test** mode.
+
+### Design notes
+
+**Why a drone, not a humanoid.** The player never looks directly at the pursuer —
+it lives at the edge of vision while their attention is on the next obstacle. A
+drone carries one bright emissive eye that says "I am here, this close" in
+peripheral vision. A second dark humanoid silhouette would compete with the
+runner's, which is the one shape the entire game depends on reading. It also needs
+no gait, no skinning and no second animation set.
+
+**Why it flies.** A flying pursuer visibly ignores terrain, so when it gains ground
+the player can see *why*. A running pursuer that keeps pace over a five-metre drop
+invites the suspicion that it is cheating — and usually it is. The drone's advantage
+is that terrain costs it nothing; its disadvantage is raw speed. Both are legible.
+
+**The fairness contract**, stated in full in `chase_director.gd`: at the settled
+distance the pursuer runs at exactly parity, so a player holding top speed is never
+overtaken. Extra speed becomes available only when the gap is already far too wide,
+so it restores a collapsed chase rather than punishing good play. Below a panic
+floor the pursuer stops closing entirely — without that, one mistake spirals into an
+unrecoverable death instead of a scare.
+
+**Camera response is functional, not just cinematic.** At close range the pursuer
+sits behind the runner, which under normal look-ahead framing puts it off the left
+edge of the screen — the most urgent thing in the game becomes invisible exactly
+when it matters. Widening brings it back and buys reaction time.
+
+### Fixed
+
+- **The chase was scenery.** The first version capped the pursuer below the runner's
+  top speed, which sounded fair and produced no game: the runner outran it forever,
+  the gap grew to 38 m, and peak threat across a whole level was 0.17. Nothing in the
+  normal test run revealed this — which is why the stall test now exists.
+- Then it was too harsh: a near-optimal run was brought to 2.6 m. Softened to 5.1 m,
+  which leaves an average player room.
+- Drone hovered too high to read, and sat outside the frame at close range.
+- Shot harness: earlier stations legitimately end in death, which deactivated the
+  chase director for every station after them — so half the sheet silently had no
+  pursuer. Each station now restarts the run and places the drone explicitly.
+
+### Verified
+
+- **Escape test:** a competent run finishes in 23.13 s with the gap oscillating
+  5.1–21.5 m and peak intensity 0.81. Tense throughout, never caught.
+- **Catch test:** a runner who stands still is caught in 2.1 s.
+- Both are gates in `scripts/test_headless.sh`. Passing only one proves nothing: the
+  first alone permits a pursuer that cannot kill, the second alone permits one that
+  cannot be escaped.
+- Browser build clean; all 5 touch profiles pass.
+
 ## Demo 0.4 — modular environment kit — 2026-09-22
 
 Level 01 is dressed. 13 procedural props, 1492 triangles total, 140 KB — and not

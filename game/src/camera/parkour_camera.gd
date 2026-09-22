@@ -43,8 +43,31 @@ extends Camera3D
 @export var min_view_distance: float = 9.0
 @export var max_view_distance: float = 17.0
 
+@export_group("Chase response")
+## How much wider the view gets at full chase intensity, as a fraction.
+##
+## Cinematic *and* functional. At close range the pursuer sits behind the runner,
+## which with normal look-ahead framing puts it off the left edge of the screen —
+## so the single most urgent thing in the game becomes invisible exactly when it
+## matters. Widening brings it back into frame, and the extra view also buys the
+## player reaction time at the moment they most need it.
+@export_range(0.0, 1.0) var threat_view_widening: float = 0.34
+
+## How much of the forward look-ahead is given up at full intensity. Under threat
+## the runner should sit closer to centre, because what is behind has become as
+## important as what is ahead.
+@export_range(0.0, 1.0) var threat_lead_reduction: float = 0.7
+
+## Rate the framing shifts at. Slow on purpose: a camera that snaps outward on every
+## intensity flicker is nauseating, and the chase's own pacing is already gradual.
+@export var threat_response_speed: float = 1.1
+
 ## Resolved distance for the current viewport. Recomputed on resize.
 var view_distance: float = 11.0
+
+## Smoothed chase intensity, 0..1.
+var _threat: float = 0.0
+var _threat_target: float = 0.0
 
 ## Height above the runner's feet the camera aims at. Slightly above mid-body, so
 ## the ground line sits below centre and the space the runner is moving into gets
@@ -111,8 +134,9 @@ func _resolve_view_distance() -> void:
 	var half_fov: float = tan(deg_to_rad(fov_base * 0.5))
 	if is_zero_approx(half_fov) or is_zero_approx(aspect):
 		return
-	var ideal: float = target_view_width / (2.0 * half_fov * aspect)
-	view_distance = clampf(ideal, min_view_distance, max_view_distance)
+	var wanted_width: float = target_view_width * (1.0 + threat_view_widening * _threat)
+	var ideal: float = wanted_width / (2.0 * half_fov * aspect)
+	view_distance = clampf(ideal, min_view_distance, max_view_distance * (1.0 + threat_view_widening))
 
 	# Tall screens get the action raised out of the thumb zone. Scaled by how tall
 	# the screen is, so a mildly narrow window is barely affected.
@@ -142,8 +166,14 @@ func _physics_process(delta: float) -> void:
 		velocity_x = p.velocity.x
 		facing = p.facing
 
+	# Ease toward the reported chase intensity and re-derive framing from it.
+	if not is_equal_approx(_threat, _threat_target):
+		_threat = lerpf(_threat, _threat_target, _smooth(threat_response_speed, delta))
+		_resolve_view_distance()
+
+	var lead_scale: float = 1.0 - threat_lead_reduction * _threat
 	var goal: Vector3 = target.global_position
-	goal.x += facing * lead_bias + signf(velocity_x) * look_ahead_max * speed_ratio
+	goal.x += (facing * lead_bias + signf(velocity_x) * look_ahead_max * speed_ratio) * lead_scale
 	goal.y += height_offset
 
 	if not _initialised:
@@ -199,3 +229,10 @@ func _on_player_landed(impact_speed: float, hard: bool) -> void:
 func snap_to_target() -> void:
 	_initialised = false
 	_shake = 0.0
+	_threat = _threat_target
+	_resolve_view_distance()
+
+
+## Reports chase pressure, 0..1. Connected to `ChaseDirector.intensity_changed`.
+func set_threat(intensity: float) -> void:
+	_threat_target = clampf(intensity, 0.0, 1.0)
