@@ -5,6 +5,67 @@ All notable progress, recorded per playable demo. Newest first.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 Every entry corresponds to a commit on `main` that produced a working build.
 
+## Demo 0.3 — procedural character + skeletal animation — 2026-09-22
+
+The placeholder box rig is gone. The runner is now a skinned mesh generated
+headlessly by Blender and posed through a real `Skeleton3D`.
+
+### Added
+
+**Character pipeline (Phase 3)**
+- `blender/scripts/rig_spec.py` — every proportion and the whole 20-bone skeleton
+  in one file, imported by the mesh builder. Nothing about the character's
+  dimensions is written down twice.
+- `blender/scripts/build_runner.py` — generates mesh, armature, skin weights and
+  exports GLB, entirely headlessly. **586 vertices, 1088 triangles, 76 KB.**
+  - Original minimalist courier: tapering limbs so the outline reads as athletic
+    rather than tubular, an accent shoulder yoke that makes orientation and lean
+    legible at ~150 px, and a low backpack that breaks the torso outline so front
+    and back are distinguishable in pure silhouette.
+  - Skinning is deliberate, not automatic. Each mesh ring binds to its own bone
+    and only the rings flanking a joint blend 50/50. Blender's automatic weights
+    are softer but blobbier; predictable deformation is worth more when the same
+    rig has to hold up in a vault, a slide and a hang.
+- `scripts/build_assets.sh` — regenerates all Blender art and reimports it.
+
+**Animation (Phase 4)**
+- `RunnerAnimator` now drives the real skeleton. The pose data and blending
+  carried over from the box rig untouched, which was the point of keeping them
+  separate from the mesh.
+- Poses authored in *character space* ("swing this limb forward") and converted
+  per bone at bind time. Torso lean splits across the spine chain so the back
+  curves instead of hinging at one joint.
+
+**Tooling**
+- `scripts/pose_sheet.sh` — renders the runner alone, large, on neutral grey, one
+  frame per pose, **with numeric bone landmarks printed alongside**. Reading a
+  pose off a 150 px dark shape in a busy scene cannot distinguish "the pose is
+  wrong" from "the model is rotated" from "you are misreading it"; this does.
+- `game/tests/rig_report.gd` — dumps the imported hierarchy and every bone's rest
+  orientation.
+
+### Fixed
+
+- **Bone poses discarded the rest orientation.** `set_bone_pose_rotation` sets a
+  bone's *absolute* local rotation — it does not compose with the rest — so
+  passing the delta alone snapped every limb to the skeleton's default axis and
+  pointed them straight up. The foot bone sat at y ≈ 1.82 instead of 0.06, level
+  with the head. From the outside this looked like a broken model or a bad glTF
+  export. What identified it was printing landmark positions instead of looking at
+  renders: "FootL y=1.82" is unambiguous where the image was not.
+- `Pose.get()` shadowed `Object.get` and failed to compile; renamed `angle_for`.
+- `mathutils.Vector` takes one sequence, not separate components.
+- Props were still mirroring the dark sky on camera-facing faces; metallic reduced
+  further.
+
+### Verified
+
+- Every pose's landmarks are anatomically sensible: standing has feet at 0.06 and
+  hands at 0.84; the jump tuck lifts feet to 0.32 and hands to 1.83; the slide
+  puts feet 0.82 m forward; the ledge hang puts hands at 2.03, overhead.
+- Autopilot still completes 244 m in 23.1 s with every state exercised.
+- Web export clean.
+
 ## Demo 0.2 — parkour vocabulary — 2026-09-22
 
 The full movement set, chosen contextually. Course extended to 244 m and rebuilt

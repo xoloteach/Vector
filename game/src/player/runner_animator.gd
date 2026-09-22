@@ -102,6 +102,20 @@ class Pose:
 		root_y = lerpf(root_y, other.root_y, t)
 		squash = lerpf(squash, other.squash, t)
 
+	## Reads a field by name, so tooling can iterate the bindings generically.
+	## Not called `get` — that shadows `Object.get` and fails to compile.
+	func angle_for(field: String) -> float:
+		match field:
+			"hip_l": return hip_l
+			"hip_r": return hip_r
+			"knee_l": return knee_l
+			"knee_r": return knee_r
+			"shoulder_l": return shoulder_l
+			"shoulder_r": return shoulder_r
+			"elbow_l": return elbow_l
+			"elbow_r": return elbow_r
+			_: return 0.0
+
 	## Builds a pose from degrees, which is how they are actually authored.
 	static func make(
 		hip_lead: float, hip_trail: float,
@@ -130,6 +144,38 @@ class Pose:
 # Each is shaped so that its *silhouette alone* identifies the action. That is the
 # test: at 150 px, with no colour information, a slide must not be confusable with a
 # crouch, and a vault must not be confusable with a jump.
+
+## Looks up an authored pose by state name, for tooling (the pose sheet).
+## Returns null for states with no single authored pose, such as `Run`.
+static func pose_for_state(state: StringName) -> Pose:
+	match state:
+		PlayerState.IDLE, PlayerState.RUN:
+			return _pose_idle()
+		PlayerState.JUMP:
+			return _pose_air_rise()
+		PlayerState.FALL:
+			return _pose_air_fall()
+		PlayerState.LAND:
+			return _pose_land()
+		PlayerState.HARD_LANDING:
+			return _pose_hard_landing()
+		PlayerState.SLIDE:
+			return _pose_slide()
+		PlayerState.ROLL:
+			return _pose_roll()
+		PlayerState.VAULT:
+			return _pose_vault_low()
+		PlayerState.CLIMB:
+			return _pose_climb()
+		PlayerState.LEDGE_GRAB:
+			return _pose_ledge_hang()
+		PlayerState.WALL_RUN:
+			return _pose_wall_run()
+		PlayerState.DEATH:
+			return _pose_death()
+		_:
+			return null
+
 
 static func _pose_idle() -> Pose:
 	return Pose.make(4, -4, -9, -9, -6, 6, 18, 3)
@@ -192,19 +238,41 @@ static func _pose_death() -> Pose:
 
 
 # --- rig ----------------------------------------------------------------------
+#
+# Poses a real `Skeleton3D` from the Blender-generated GLB. The box rig this
+# replaced is gone; the pose data and blending carried over untouched, which was
+# the point of separating them from the mesh in the first place.
+
+## Maps a pose field to the bone it drives.
+const BONE_BINDINGS: Dictionary[String, String] = {
+	"hip_l": "ThighL",
+	"hip_r": "ThighR",
+	"knee_l": "ShinL",
+	"knee_r": "ShinR",
+	"shoulder_l": "UpperArmL",
+	"shoulder_r": "UpperArmR",
+	"elbow_l": "ForearmL",
+	"elbow_r": "ForearmR",
+}
+
+## Bone that carries the torso lean. The lean is split across the spine chain so
+## it curves rather than hinging at one joint.
+const SPINE_BONES: PackedStringArray = ["Spine", "Chest"]
 
 var _player: Player
-var _root: Node3D
-var _torso: Node3D
-var _head: Node3D
-var _hip_l: Node3D
-var _hip_r: Node3D
-var _knee_l: Node3D
-var _knee_r: Node3D
-var _shoulder_l: Node3D
-var _shoulder_r: Node3D
-var _elbow_l: Node3D
-var _elbow_r: Node3D
+var _skeleton: Skeleton3D
+
+## Bone index per pose field, resolved once.
+var _bone_index: Dictionary[String, int] = {}
+## Rotation axis for each bone, in that bone's own local space, corresponding to
+## the character-space Z axis. See `_resolve_axis` for why this is necessary.
+var _bone_axis: Dictionary[String, Vector3] = {}
+## Each bone's rest rotation. Must be composed with the pose rotation — see
+## `_pose_bone`.
+var _bone_rest: Dictionary[String, Quaternion] = {}
+var _spine_index: Array[int] = []
+var _spine_axis: Array[Vector3] = []
+var _spine_rest: Array[Quaternion] = []
 
 ## The live pose, blended toward the target every frame.
 var _current: Pose = Pose.new()
@@ -223,7 +291,126 @@ func _ready() -> void:
 	if _player != null:
 		_player.landed.connect(_on_landed)
 		_player.rolled.connect(_on_rolled)
-	_build()
+
+	_skeleton = _find_skeleton(self)
+	if _skeleton == null:
+		push_error("RunnerAnimator found no Skeleton3D. Run ./scripts/build_assets.sh.")
+		return
+
+	_bind_bones()
+	_apply_materials()
+
+
+func _find_skeleton(node: Node) -> Skeleton3D:
+	if node is Skeleton3D:
+		return node
+	for child: Node in node.get_children():
+		var found: Skeleton3D = _find_skeleton(child)
+		if found != null:
+			return found
+	return null
+
+
+func _bind_bones() -> void:
+	for field: String in BONE_BINDINGS:
+		var bone_name: String = BONE_BINDINGS[field]
+		var index: int = _skeleton.find_bone(bone_name)
+		if index < 0:
+			push_warning("Runner skeleton has no bone '%s'." % bone_name)
+			continue
+		_bone_index[field] = index
+		_bone_axis[field] = _resolve_axis(index)
+		_bone_rest[field] = _rest_rotation(index)
+
+	for bone_name: String in SPINE_BONES:
+		var index: int = _skeleton.find_bone(bone_name)
+		if index < 0:
+			continue
+		_spine_index.append(index)
+		_spine_axis.append(_resolve_axis(index))
+		_spine_rest.append(_rest_rotation(index))
+
+
+static func rest_rotation_of(skeleton: Skeleton3D, bone_index: int) -> Quaternion:
+	return skeleton.get_bone_rest(bone_index).basis.get_rotation_quaternion()
+
+
+func _rest_rotation(bone_index: int) -> Quaternion:
+	return rest_rotation_of(_skeleton, bone_index)
+
+
+## Finds the axis, in a bone's local space, that rotates it about the character's
+## Z axis.
+##
+## Necessary because poses are authored in character space ("swing this limb
+## forward") while `set_bone_pose_rotation` takes a rotation in the bone's own
+## space, and the two differ per bone depending on how the exporter oriented it.
+## Hard-coding a local axis would work for the legs and silently mangle the arms.
+##
+## Derivation: a bone's posed global basis is `B · R(a, θ)` where `B` is its global
+## rest basis. The conjugation identity `B·R(a,θ) = R(B·a, θ)·B` means that to get a
+## rotation of `θ` about character-space `Z`, we need `B·a = Z`, hence
+## `a = B⁻¹ · Z`.
+##
+## Using the *rest* basis is deliberate: the live basis includes the parent's pose,
+## so a child's rotation is automatically carried along by its parent. That is
+## exactly the forward-kinematic behaviour wanted — a knee bend is relative to the
+## thigh, not to the world.
+func _resolve_axis(bone_index: int) -> Vector3:
+	var rest_basis: Basis = _skeleton.get_bone_global_rest(bone_index).basis
+	return (rest_basis.inverse() * Vector3(0.0, 0.0, 1.0)).normalized()
+
+
+## Replaces the GLB's materials with tuned Godot ones.
+##
+## Art direction needs a fast iteration loop, and re-running Blender to adjust a
+## value is not one. Blender exports placeholder colours under known names; the real
+## look is defined here.
+func _apply_materials() -> void:
+	var mesh_instance: MeshInstance3D = _find_mesh(self)
+	if mesh_instance == null or mesh_instance.mesh == null:
+		return
+
+	# Three value steps inside the silhouette. The figure still reads as one dark
+	# shape, but limb positions are legible against the torso — without this the
+	# whole figure merges into a single rectangle and no pose is distinguishable.
+	var by_name: Dictionary[String, StandardMaterial3D] = {
+		"suit": _character_material(Color(0.046, 0.054, 0.072)),
+		"trim": _character_material(Color(0.094, 0.105, 0.132)),
+		"accent": _character_material(Color(0.88, 0.48, 0.14)),
+	}
+
+	for surface: int in mesh_instance.mesh.get_surface_count():
+		var source: Material = mesh_instance.mesh.surface_get_material(surface)
+		var key: String = source.resource_name if source != null else ""
+		for name: String in by_name:
+			if key.begins_with(name):
+				mesh_instance.set_surface_override_material(surface, by_name[name])
+				break
+
+
+func _find_mesh(node: Node) -> MeshInstance3D:
+	if node is MeshInstance3D:
+		return node
+	for child: Node in node.get_children():
+		var found: MeshInstance3D = _find_mesh(child)
+		if found != null:
+			return found
+	return null
+
+
+func _character_material(colour: Color) -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = colour
+	mat.roughness = 0.74
+	mat.metallic = 0.04
+	# A rim term traces the figure's outline with a faint cool highlight, so its
+	# edges stay visible on any backdrop without lifting the body value and losing
+	# the silhouette. Cheap: a per-pixel fresnel, supported on compatibility.
+	mat.rim_enabled = true
+	mat.rim = 0.66
+	mat.rim_tint = 0.22
+	return mat
 
 
 func _find_player() -> Player:
@@ -234,82 +421,6 @@ func _find_player() -> Player:
 		node = node.get_parent()
 	push_warning("RunnerAnimator could not find its Player ancestor.")
 	return null
-
-
-func _build() -> void:
-	# Three value steps inside the silhouette. The figure still reads as a dark
-	# shape, but limb positions are legible against the torso — without this the
-	# whole rig merges into one rectangle and no pose is distinguishable.
-	var torso_mat: StandardMaterial3D = _material(Color(0.042, 0.05, 0.068))
-	var limb_mat: StandardMaterial3D = _material(Color(0.072, 0.082, 0.105))
-	var near_mat: StandardMaterial3D = _material(Color(0.105, 0.118, 0.145))
-	var accent: StandardMaterial3D = _material(Color(0.86, 0.46, 0.13))
-
-	_root = Node3D.new()
-	_root.name = "Rig"
-	add_child(_root)
-
-	_torso = _joint(_root, "Torso", Vector3(0.0, HIP_HEIGHT, 0.0))
-	_box(_torso, Vector3(0.34, 0.56, 0.24), Vector3(0.0, 0.28, 0.0), torso_mat)
-	# Shoulder yoke in the accent colour: a readable highlight that makes body
-	# orientation and lean obvious at small sizes.
-	_box(_torso, Vector3(0.40, 0.10, 0.26), Vector3(0.0, 0.52, 0.0), accent)
-
-	_head = _joint(_torso, "Head", Vector3(0.0, SHOULDER_HEIGHT - HIP_HEIGHT, 0.0))
-	_box(_head, Vector3(0.21, 0.24, 0.22), Vector3(0.0, HEAD_TOP - SHOULDER_HEIGHT + 0.02, 0.0), torso_mat)
-
-	# Near-side limbs (+Z, toward the camera) are the lighter pair.
-	_hip_l = _joint(_root, "HipL", Vector3(0.0, HIP_HEIGHT, 0.115))
-	_hip_r = _joint(_root, "HipR", Vector3(0.0, HIP_HEIGHT, -0.115))
-	_knee_l = _limb(_hip_l, "KneeL", THIGH, SHIN, 0.155, near_mat)
-	_knee_r = _limb(_hip_r, "KneeR", THIGH, SHIN, 0.155, limb_mat)
-
-	_shoulder_l = _joint(_torso, "ShoulderL", Vector3(0.0, SHOULDER_HEIGHT - HIP_HEIGHT - 0.05, 0.17))
-	_shoulder_r = _joint(_torso, "ShoulderR", Vector3(0.0, SHOULDER_HEIGHT - HIP_HEIGHT - 0.05, -0.17))
-	_elbow_l = _limb(_shoulder_l, "ElbowL", UPPER_ARM, FOREARM, 0.105, near_mat)
-	_elbow_r = _limb(_shoulder_r, "ElbowR", UPPER_ARM, FOREARM, 0.105, limb_mat)
-
-
-func _limb(
-	parent: Node3D, child_name: String, upper: float, lower: float,
-	thickness: float, mat: StandardMaterial3D
-) -> Node3D:
-	_box(parent, Vector3(thickness, upper, thickness), Vector3(0.0, -upper * 0.5, 0.0), mat)
-	var joint: Node3D = _joint(parent, child_name, Vector3(0.0, -upper, 0.0))
-	_box(joint, Vector3(thickness * 0.88, lower, thickness * 0.88), Vector3(0.0, -lower * 0.5, 0.0), mat)
-	return joint
-
-
-func _joint(parent: Node3D, joint_name: String, offset: Vector3) -> Node3D:
-	var node := Node3D.new()
-	node.name = joint_name
-	node.position = offset
-	parent.add_child(node)
-	return node
-
-
-func _box(parent: Node3D, size: Vector3, offset: Vector3, mat: StandardMaterial3D) -> void:
-	var mesh_instance := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	mesh_instance.mesh = mesh
-	mesh_instance.position = offset
-	mesh_instance.material_override = mat
-	parent.add_child(mesh_instance)
-
-
-func _material(colour: Color) -> StandardMaterial3D:
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = colour
-	mat.roughness = 0.75
-	mat.metallic = 0.05
-	# A rim term traces the outline of every limb with a faint cool highlight, so the
-	# figure's edges stay visible on any backdrop without lifting the body value and
-	# losing the silhouette. Cheap: a per-pixel fresnel, supported on compatibility.
-	mat.rim_enabled = true
-	mat.rim = 0.62
-	mat.rim_tint = 0.25
-	return mat
 
 
 # --- per-frame ----------------------------------------------------------------
@@ -449,36 +560,65 @@ func _run_pose(speed_ratio: float) -> Pose:
 	return p
 
 
-func _apply(delta: float, state: StringName, speed_ratio: float, grounded: bool) -> void:
-	# Z axis throughout — see the note on `Pose`. Rotating these about X swings the
-	# limbs into the screen, where the side-view camera cannot see them.
+func _apply(_delta: float, state: StringName, _speed_ratio: float, grounded: bool) -> void:
+	if _skeleton == null:
+		return
+
+	# Each bone rotates about the axis that corresponds to the character's Z axis in
+	# that bone's own local space — see `_resolve_axis`. Poses stay authored in
+	# character space ("swing this limb forward") and the per-bone conversion happens
+	# here.
 	#
-	# Limbs hang downward, so a positive Z rotation already swings them forward.
-	_hip_l.rotation.z = _current.hip_l
-	_hip_r.rotation.z = _current.hip_r
-	_knee_l.rotation.z = _current.knee_l
-	_knee_r.rotation.z = _current.knee_r
-	_shoulder_l.rotation.z = _current.shoulder_l
-	_shoulder_r.rotation.z = _current.shoulder_r
-	_elbow_l.rotation.z = _current.elbow_l
-	_elbow_r.rotation.z = _current.elbow_r
+	# Limbs hang downward, so a positive rotation swings them forward.
+	_pose_bone("hip_l", _current.hip_l)
+	_pose_bone("hip_r", _current.hip_r)
+	_pose_bone("knee_l", _current.knee_l)
+	_pose_bone("knee_r", _current.knee_r)
+	_pose_bone("shoulder_l", _current.shoulder_l)
+	_pose_bone("shoulder_r", _current.shoulder_r)
+	_pose_bone("elbow_l", _current.elbow_l)
+	_pose_bone("elbow_r", _current.elbow_r)
 
-	# The torso points upward, so a forward lean is a negative Z rotation. Negated
-	# here so poses can be authored with "positive = forward" throughout.
-	_torso.rotation.z = -_current.torso
+	# The spine points upward, so a forward lean is a negative rotation. Negated here
+	# so poses stay authored "positive = forward" throughout. Split across the chain
+	# so the back curves instead of hinging at a single joint.
+	var per_joint: float = -_current.torso / maxf(1.0, float(_spine_index.size()))
+	for i: int in _spine_index.size():
+		_skeleton.set_bone_pose_rotation(
+			_spine_index[i], _spine_rest[i] * Quaternion(_spine_axis[i], per_joint)
+		)
 
-	# Whole-body attitude. In the air, pitch follows vertical velocity so rising and
-	# falling read differently even before the pose finishes blending.
+	# Whole-body attitude, applied to this node rather than to a bone: it is a
+	# transform of the entire figure, and expressing it as a root-bone rotation would
+	# make the roll's full revolution fight the skinning.
 	var pitch: float = _current.root_pitch
 	if not grounded and state != PlayerState.WALL_RUN and state != PlayerState.LEDGE_GRAB:
 		pitch += deg_to_rad(clampf(-_player.velocity.y * 0.45, -12.0, 18.0))
 	if state == PlayerState.ROLL:
 		pitch += _roll_spin
-	_root.rotation.z = -pitch
+	rotation.z = -pitch
 
 	var compress: float = _squash * 0.26
-	_root.position.y = _current.root_y - compress
-	_root.scale = Vector3(1.0 + compress * 0.5, 1.0 - compress, 1.0 + compress * 0.5)
+	position.y = _current.root_y - compress
+	scale = Vector3(1.0 + compress * 0.5, 1.0 - compress, 1.0 + compress * 0.5)
+
+
+## Rotates a bone by `angle` about the character's Z axis, from its rest pose.
+##
+## The rest rotation must be composed in. `set_bone_pose_rotation` sets the bone's
+## **absolute** local rotation, it does not add to the rest — so passing the delta
+## alone silently discards the bone's rest orientation. Every limb then snapped to
+## the skeleton's default axis and pointed straight *up*: the foot bone ended up at
+## y ≈ 1.82 instead of 0.06, level with the head. From the outside that looked like
+## a broken model or a bad export, and it cost two diagnostic passes to localise. The
+## numbers in `pose_sheet.gd` are what finally identified it.
+func _pose_bone(field: String, angle: float) -> void:
+	if not _bone_index.has(field):
+		return
+	_skeleton.set_bone_pose_rotation(
+		_bone_index[field],
+		_bone_rest[field] * Quaternion(_bone_axis[field], angle)
+	)
 
 
 func _on_landed(impact_speed: float, hard: bool) -> void:
