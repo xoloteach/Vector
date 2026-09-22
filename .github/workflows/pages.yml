@@ -6,10 +6,14 @@ name: Deploy to GitHub Pages
 # Deliberately builds rather than publishing the committed export: the deployed
 # game is then guaranteed to correspond to the source at that commit, so a
 # forgotten `export_web.sh` can never ship a stale build. The copy committed under
-# exports/ stays as a fallback for deploying without CI.
+# exports/web/ stays as a fallback for deploying without CI.
 #
 # There is no gh-pages branch. Pages is served from the Actions artifact produced
 # by this workflow, on `main`.
+#
+# Action versions are pinned to Node 24 releases. GitHub forces all Actions onto
+# Node 24 from June 2026, and the Node 20 versions emit deprecation warnings until
+# then.
 
 on:
   push:
@@ -38,15 +42,15 @@ env:
 
 jobs:
   build:
-    name: Export web build
+    name: Validate, test and export
     runs-on: ubuntu-latest
     steps:
       - name: Check out main
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Cache Godot and export templates
         id: cache-godot
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/godot
@@ -102,12 +106,22 @@ jobs:
         run: touch exports/web/.nojekyll
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: exports/web
 
+      # Always keep a plain downloadable copy of the build. If Pages is not
+      # enabled on the repository, this is how the playable build is still
+      # retrievable from any successful run.
+      - name: Upload playable build as a downloadable artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: roofline-web-build
+          path: exports/web
+          retention-days: 30
+
   deploy:
-    name: Publish
+    name: Publish to Pages
     needs: build
     runs-on: ubuntu-latest
     environment:
@@ -116,4 +130,38 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        # Tolerated on purpose.
+        #
+        # `deploy-pages` returns 404 when Pages has never been enabled on the
+        # repository, which is an account/repo *setting* and cannot be turned on
+        # from a workflow or with the default token (the REST call returns 403).
+        # Without this, every push would show a red build for a reason unrelated
+        # to the code, which trains everyone to ignore CI. The build job above
+        # still fails hard on real regressions — it validates, parses, runs the
+        # autopilot and verifies the export — so the signal that matters is
+        # preserved.
+        continue-on-error: true
+        uses: actions/deploy-pages@v5
+
+      - name: Explain a failed deployment
+        if: steps.deployment.outcome == 'failure'
+        run: |
+          echo "::warning title=GitHub Pages is not enabled::The build succeeded but could not be published."
+          {
+            echo "### Build succeeded — publishing skipped"
+            echo
+            echo "The web export built, validated and passed the gameplay test, but"
+            echo "GitHub Pages could not accept the deployment."
+            echo
+            echo "**Almost certainly:** Pages has not been enabled on this repository."
+            echo "It cannot be enabled from a workflow — it is a repository setting."
+            echo
+            echo "**To fix, once:** Settings → Pages → Build and deployment →"
+            echo "Source → **GitHub Actions**, then re-run this workflow."
+            echo
+            echo "No code changes are required. Everything needed is already committed."
+            echo
+            echo "In the meantime the playable build is available two other ways:"
+            echo "- the \`roofline-web-build\` artifact on this run"
+            echo "- the committed copy in \`exports/web/\` (serve it over HTTP, not file://)"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -20,7 +20,10 @@ const DIM: Color = Color(0.62, 0.67, 0.76)
 var _timer_label: Label
 var _speed_bar: ProgressBar
 var _progress_bar: ProgressBar
+var _meters: VBoxContainer
 var _state_label: Label
+var _rotate_hint: Label
+var _touch_mode: bool = false
 var _banner: PanelContainer
 var _banner_title: Label
 var _banner_hint: Label
@@ -65,6 +68,7 @@ func _build_top_left() -> void:
 	caption.add_theme_font_size_override("font_size", 12)
 	caption.add_theme_color_override("font_color", DIM)
 	box.add_child(caption)
+	_build_rotate_hint()
 
 	_timer_label = Label.new()
 	_timer_label.text = "0:00.000"
@@ -82,6 +86,7 @@ func _build_bottom() -> void:
 	box.custom_minimum_size = Vector2(190, 0)
 	box.add_theme_constant_override("separation", 3)
 	add_child(box)
+	_meters = box
 
 	var caption := Label.new()
 	caption.text = "SPEED"
@@ -171,6 +176,44 @@ func _build_banner() -> void:
 	add_child(_banner)
 
 
+## A quiet suggestion to rotate, shown only on screens too narrow to frame the
+## game well.
+##
+## The camera already adapts to portrait so the game stays playable, but a side-view
+## runner genuinely wants a wide screen: in portrait there is far less track
+## visible ahead, which costs reaction time. Rather than silently serving the worse
+## experience, say so — once, unobtrusively, and never as a blocking overlay,
+## because being unable to play at all is worse than playing in portrait.
+func _build_rotate_hint() -> void:
+	_rotate_hint = Label.new()
+	_rotate_hint.text = "↻  Rotate for a wider view"
+	_rotate_hint.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_rotate_hint.anchor_left = 0.5
+	_rotate_hint.anchor_right = 0.5
+	_rotate_hint.anchor_top = 0.0
+	_rotate_hint.anchor_bottom = 0.0
+	_rotate_hint.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_rotate_hint.offset_top = 14
+	_rotate_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_rotate_hint.add_theme_font_size_override("font_size", 14)
+	_rotate_hint.add_theme_color_override("font_color", Color(INK, 0.72))
+	_rotate_hint.visible = false
+	add_child(_rotate_hint)
+
+	get_viewport().size_changed.connect(_update_rotate_hint)
+	_update_rotate_hint()
+
+
+func _update_rotate_hint() -> void:
+	if _rotate_hint == null:
+		return
+	# Only worth saying on a device that can actually be rotated.
+	var touch_device: bool = _touch_mode or DisplayServer.is_touchscreen_available()
+	var camera: ParkourCamera = _level.camera if _level != null else null
+	var cramped: bool = camera.is_aspect_cramped() if camera != null else false
+	_rotate_hint.visible = touch_device and cramped
+
+
 func _build_debug() -> void:
 	_state_label = Label.new()
 	_state_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
@@ -186,6 +229,7 @@ func _build_debug() -> void:
 # ----------------------------------------------------------------------- updates
 
 func _process(_delta: float) -> void:
+	_check_debug_toggle()
 	_timer_label.text = Game.format_time(Game.run_time)
 
 	if _player == null:
@@ -217,10 +261,31 @@ func _debug_text() -> String:
 	return "\n".join(lines)
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"debug_toggle"):
+func _check_debug_toggle() -> void:
+	# Polled rather than event-driven, for the same reason as the level's restart
+	# and pause: synthetic actions from the touch controls have no InputEvent.
+	if Input.is_action_just_pressed(&"debug_toggle"):
 		_debug_visible = not _debug_visible
 		_state_label.visible = _debug_visible
+
+
+## Relayouts for touch play.
+##
+## The speed and route meters live in the bottom-left corner, which is exactly
+## where the left thumb cluster goes. Rather than shrink the controls or overlap
+## them, the meters move up under the timer — still out of the centre action band,
+## still in peripheral vision, and now nothing is under a thumb.
+func set_touch_mode(active: bool) -> void:
+	if _touch_mode == active:
+		return
+	_touch_mode = active
+	if active:
+		_meters.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		_meters.position = Vector2(MARGIN, MARGIN + 74)
+	else:
+		_meters.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+		_meters.position = Vector2(MARGIN, -76)
+	_update_rotate_hint()
 
 
 # ------------------------------------------------------------------------ events

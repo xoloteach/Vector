@@ -77,13 +77,18 @@ func _ready() -> void:
 	Game.start_run()
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"restart"):
+## Restart and pause are **polled**, not handled as events.
+##
+## The on-screen touch controls drive the game through `Input.action_press()`,
+## which sets an action's state but does not synthesise an `InputEvent`. Anything
+## reading `event.is_action_pressed()` in `_input`/`_unhandled_input` is therefore
+## invisible to touch. Polling `Input.is_action_just_pressed()` sees keyboard,
+## gamepad and touch identically, so there is one code path for all of them.
+func _process(_delta: float) -> void:
+	if Input.is_action_just_pressed(&"restart"):
 		Game.restart_level()
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed(&"pause"):
+	elif Input.is_action_just_pressed(&"pause"):
 		Game.toggle_pause()
-		get_viewport().set_input_as_handled()
 
 
 ## Override to place geometry. Use `spawn()` so everything lands under the

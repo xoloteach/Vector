@@ -41,7 +41,37 @@ obstacle and the character picks the traversal that fits its height, your
 speed, and the landing space on the far side. Jump is forgiving — it has
 coyote time and input buffering.
 
-Touch controls appear automatically on touch devices.
+### Touch controls
+
+Phones and tablets are a supported way to play, not an afterthought. On-screen
+controls appear automatically on any touch device — and also the moment a real
+touch arrives, which covers touch-capable laptops whose browsers under-report
+their capabilities. They disappear again on keyboard input.
+
+| Control | Position | Notes |
+| --- | --- | --- |
+| Run left / right | Left thumb, side by side | Hold to run |
+| Jump | Right thumb, outermost | **Hold for a full jump, tap for a hop** — variable height works exactly as on keyboard |
+| Slide / roll | Right thumb, inboard and above | Placed along the arc a thumb naturally travels |
+| Restart, pause | Top right, small | Out of the action band |
+
+- **Full multi-touch.** Each finger is tracked independently, so holding a
+  direction while jumping and sliding works. This is table stakes for a parkour
+  game and is verified automatically — see `scripts/test_mobile.sh`.
+- **Sliding between buttons works.** Dragging a thumb off one control and onto
+  another releases the first and presses the second, so fast direction changes
+  and jump→slide chains do not drop inputs.
+- **Hit areas are larger than the artwork**, because fingers are imprecise and
+  hidden under your own hand.
+- **Layout scales with the screen**, sized from the viewport's short edge, and
+  rearranges between portrait and landscape.
+- Losing focus mid-hold (a call, a notification, a tab switch) releases
+  everything, so the runner never gets stuck sprinting into a wall.
+
+Landscape is the intended orientation — a side-view runner needs horizontal room
+to read what is coming. Portrait is fully playable: the camera automatically
+pulls back to preserve horizontal coverage and lifts its aim clear of the thumb
+zone, and a quiet hint suggests rotating. It never blocks play.
 
 ---
 

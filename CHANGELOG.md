@@ -5,6 +5,59 @@ All notable progress, recorded per playable demo. Newest first.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 Every entry corresponds to a commit on `main` that produced a working build.
 
+## Touch controls + Pages hardening — 2026-09-22
+
+### Added
+- **On-screen touch controls** (`src/ui/touch_controls.gd`) — a first-class input
+  path, not a fallback. Left thumb runs, right thumb jumps and slides, with pause
+  and restart tucked top-right.
+  - True multi-touch: every finger is tracked independently, so holding a
+    direction while jumping and sliding works.
+  - Buttons *hold* their action rather than pulsing it, so variable jump height
+    and sustained slides behave exactly as on keyboard.
+  - Dragging a thumb between controls releases one and presses the next, so fast
+    direction changes and jump-to-slide chains do not drop inputs.
+  - Hit areas are 22% larger than the artwork, because fingers are imprecise.
+  - Layout derives from the viewport short edge and rearranges between portrait
+    and landscape; vector glyphs, so no font asset and no translation needed.
+  - Auto-reveals on a touch device or on the first real touch event, and hides
+    again on keyboard input.
+  - Releases every held action on focus loss, so a call or tab switch cannot
+    leave the runner sprinting into a wall.
+- `scripts/test_mobile.sh` + `scripts/capture_mobile.mjs` — drives the exported
+  build in a real touch-capable browser context across five phone and tablet
+  profiles in both orientations, using CDP multi-touch to verify that holding a
+  direction *and* jumping works. Playwright's own touchscreen API only supports
+  single taps, which would have missed exactly the case most likely to break.
+- Aspect-adaptive camera framing: distance is now derived from a target
+  *horizontal* world width instead of being fixed, so the visible slice of track
+  stays consistent from ultrawide to portrait.
+- A quiet "rotate for a wider view" hint on cramped screens — never blocking.
+- Downloadable `roofline-web-build` CI artifact, so the playable build is
+  retrievable even while Pages is disabled.
+
+### Fixed
+- **Restart, pause and the debug overlay were unreachable by touch.**
+  `Input.action_press()` sets action state without synthesising an `InputEvent`,
+  so every handler using `event.is_action_pressed()` was invisible to the touch
+  controls. These now poll `Input.is_action_just_pressed()`, which sees keyboard,
+  gamepad and touch identically.
+- **Portrait framing was unplayable.** Godot's default `KEEP_HEIGHT` aspect
+  handling fixes the vertical field of view, so a narrow screen collapsed the
+  horizontal view to about two metres with the runner filling the frame.
+- HUD speed and route meters sat exactly under the left thumb cluster; they now
+  relocate under the timer whenever touch controls are visible.
+- Default handheld orientation was portrait; corrected to landscape.
+- Pages workflow: bumped to Node 24 action releases (`checkout@v7`, `cache@v6`,
+  `upload-pages-artifact@v5`, `deploy-pages@v5`) ahead of GitHub forcing Node 24.
+- Pages deploy step is `continue-on-error` with an explanatory job summary. The
+  deployment 404s until Pages is enabled on the repository, which cannot be done
+  from a workflow; failing the whole run on a repo setting would have trained
+  everyone to ignore a red build. The build job still fails hard on regressions.
+
+### Known
+- GitHub Pages still needs one manual enable — see `TODO.md` blockers.
+
 ## Demo 0.1 — "Service Deck" — 2026-09-22
 
 First playable browser build. Run, jump, fall, land, die, retry, finish — on a

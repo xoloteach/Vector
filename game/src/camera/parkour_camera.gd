@@ -20,15 +20,31 @@ extends Camera3D
 @export var target: Node3D
 
 @export_group("Framing")
-## Distance from the play plane.
+## Horizontal slice of the world the camera tries to keep visible, in metres.
 ##
-## Sized from the character, not from the level. At 42° FOV this shows about
-## 8.4 m of height, which puts the 1.8 m runner at roughly 21% of frame height —
-## large enough that limb articulation, lean and landing compression are all
-## legible. The first version sat at 15 m, and the runner was a ~90 px blob that
-## no critic could read; being able to see more of the level ahead is worth
-## nothing if the thing you are steering is illegible.
-@export var view_distance: float = 11.0
+## **Framing is driven by width, not distance.** A side-view runner lives or dies
+## on how much track is visible ahead, and Godot's default `KEEP_HEIGHT` aspect
+## handling gives none of that guarantee: it fixes the *vertical* field of view,
+## so on a narrow screen the horizontal view collapses. On a portrait phone the
+## runner filled the frame and roughly two metres of level were visible — not
+## playable.
+##
+## Deriving distance from the desired width instead keeps the horizontal read
+## consistent from ultrawide to portrait.
+@export var target_view_width: float = 15.0
+
+## Bounds on the derived distance.
+##
+## The lower bound stops an ultrawide screen from shoving the camera into the
+## runner's face; the upper bound stops a portrait screen from pushing so far back
+## that the character becomes an unreadable speck. Inside these bounds the width
+## target is honoured exactly; outside them, width is sacrificed to keep the
+## character legible, because an illegible character is the worse failure.
+@export var min_view_distance: float = 9.0
+@export var max_view_distance: float = 17.0
+
+## Resolved distance for the current viewport. Recomputed on resize.
+var view_distance: float = 11.0
 
 ## Height above the runner's feet the camera aims at. Slightly above mid-body, so
 ## the ground line sits below centre and the space the runner is moving into gets
@@ -66,6 +82,8 @@ extends Camera3D
 var _focus: Vector3 = Vector3.ZERO
 var _shake: float = 0.0
 var _initialised: bool = false
+## Upward aim bias applied on tall/narrow screens, in metres.
+var _cramped_lift: float = 0.0
 
 
 func _ready() -> void:
@@ -76,6 +94,39 @@ func _ready() -> void:
 		var p: Player = target
 		p.landed.connect(_on_player_landed)
 	set_as_top_level(true)
+
+	_resolve_view_distance()
+	get_viewport().size_changed.connect(_resolve_view_distance)
+
+
+## Derives `view_distance` from the viewport aspect so the horizontal world extent
+## stays close to `target_view_width` whatever shape the screen is.
+##
+## visible_width = 2 · distance · tan(fov/2) · aspect  ⇒  solve for distance.
+func _resolve_view_distance() -> void:
+	var size: Vector2 = get_viewport().get_visible_rect().size
+	if size.x <= 0.0 or size.y <= 0.0:
+		return
+	var aspect: float = size.x / size.y
+	var half_fov: float = tan(deg_to_rad(fov_base * 0.5))
+	if is_zero_approx(half_fov) or is_zero_approx(aspect):
+		return
+	var ideal: float = target_view_width / (2.0 * half_fov * aspect)
+	view_distance = clampf(ideal, min_view_distance, max_view_distance)
+
+	# Tall screens get the action raised out of the thumb zone. Scaled by how tall
+	# the screen is, so a mildly narrow window is barely affected.
+	var tallness: float = clampf((1.3 - aspect) / 0.8, 0.0, 1.0)
+	_cramped_lift = tallness * view_distance * 0.115
+
+
+## True on screens too narrow to frame the game properly, so the UI can suggest
+## rotating rather than silently serving a bad view.
+func is_aspect_cramped() -> bool:
+	var size: Vector2 = get_viewport().get_visible_rect().size
+	if size.y <= 0.0:
+		return false
+	return (size.x / size.y) < 1.15
 
 
 func _physics_process(delta: float) -> void:
@@ -122,6 +173,12 @@ func _physics_process(delta: float) -> void:
 
 	var target_fov: float = lerpf(fov_base, fov_at_speed, speed_ratio)
 	fov = lerpf(fov, target_fov, _smooth(fov_smoothing, delta))
+
+	# On a cramped screen the runner would otherwise sit near the vertical centre
+	# with the ground hidden behind the thumb controls. Biasing the aim upward
+	# lifts the play line into the clear upper area of the display.
+	if _cramped_lift > 0.0:
+		global_position.y += _cramped_lift
 
 
 ## Frame-rate independent exponential smoothing factor.

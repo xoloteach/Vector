@@ -33,7 +33,10 @@ window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
-window/handheld/orientation=1
+; Landscape. A side-view runner needs horizontal room far more than vertical;
+; portrait still works and the touch layout adapts to it, but landscape is the
+; intended way to play.
+window/handheld/orientation=0
 
 [input]
 

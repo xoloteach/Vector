@@ -20,6 +20,7 @@ const AUTOPILOT_FLAG: String = "bot"
 
 var _level: Level
 var _hud: HUD
+var _touch: TouchControls
 var _bot: Autopilot
 
 
@@ -44,6 +45,16 @@ func _load_level(path: String) -> void:
 	add_child(_hud)
 	# Bound after both exist so the HUD never reads a half-built level.
 	_hud.bind(_level.player, _level)
+
+	# Added after the HUD so touch controls sit on top of it. They reveal
+	# themselves only on a touch device or after a real touch event.
+	_touch = TouchControls.new()
+	_touch.name = "TouchControls"
+	add_child(_touch)
+	# The HUD's meters occupy the same corner as the left thumb cluster, so they
+	# move whenever the controls appear or disappear.
+	_touch.enabled_changed.connect(_hud.set_touch_mode)
+	_hud.set_touch_mode(_touch.is_enabled())
 
 	if _autopilot_requested():
 		_attach_autopilot()

@@ -57,16 +57,38 @@ any commercial game. The reference genre informs *feel*, never content.
 ## 5. Commands
 
 ```bash
-./scripts/validate.sh        # headless import + script/scene error check
-./scripts/build_assets.sh    # regenerate all Blender assets
-./scripts/export_web.sh      # export browser build to exports/web/
+./scripts/validate.sh        # import + parse every script + boot the main scene
+./scripts/test_headless.sh   # autopilot bot must complete the level  <- main gate
+./scripts/export_web.sh      # export to exports/web/ and verify the artefacts
 ./scripts/serve_web.sh       # local HTTP server for the export
-./scripts/test_web.sh        # headless Chromium smoke test + screenshots
-./scripts/capture.sh         # gameplay screenshot/frame capture for review
+./scripts/test_web.sh        # real Chromium/WebGL2 run, bot driving, screenshots
+./scripts/test_mobile.sh     # touch controls across 5 phone/tablet form factors
+./scripts/shots.sh           # fast deterministic in-engine frames (seconds)
 ```
 
-`validate.sh` and `export_web.sh` must exit non-zero on failure. If you make
-them lenient you have broken the only safety net.
+Every one of these must exit non-zero on failure. If you make them lenient you
+have broken the only safety net.
+
+**Which capture tool to use.** `shots.sh` renders deterministic frames from fixed
+stations in seconds — use it for all visual iteration and for before/after
+regression comparison. It renders with a desktop GL driver, so it proves nothing
+about the browser. `test_web.sh` is the honest end-to-end check and takes minutes.
+Iterate with the first, verify with the second.
+
+## 5a. Input rules
+
+- **Never read input in `_input`/`_unhandled_input` with `event.is_action_*`.**
+  The touch controls drive the game via `Input.action_press()`, which sets action
+  state without synthesising an `InputEvent`. Event-based handlers are invisible
+  to touch. Poll `Input.is_action_just_pressed()` instead — it sees keyboard,
+  gamepad and touch identically.
+- Gameplay input is latched in `PlayerInput._physics_process`, never `_process`.
+  The controller runs on the physics tick and must sample on the same clock.
+- Touch is a supported platform. Any new action needs an on-screen control in
+  `src/ui/touch_controls.gd`, and buttons must *hold* their action rather than
+  pulse it, or variable jump height and sustained slides break.
+- Anything the HUD draws in a screen corner must move out of the way when touch
+  controls appear (`HUD.set_touch_mode`).
 
 ## 6. Testing philosophy
 
