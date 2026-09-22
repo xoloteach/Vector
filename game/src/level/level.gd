@@ -153,7 +153,31 @@ func deck(
 		top_y - thickness * 0.5,
 		(SURFACE_FRONT_Z + SURFACE_BACK_Z) * 0.5
 	)
-	return block(centre, Vector3(width, thickness, depth), kind)
+	var body: BoxBlock = block(centre, Vector3(width, thickness, depth), kind)
+	if thickness > 1.4:
+		_add_face_seams(from_x, to_x, top_y, thickness)
+	return body
+
+
+## Horizontal seam lines across a tall deck or riser face.
+##
+## A flush riser's front face is a large flat rectangle aimed straight at the
+## camera, and undressed it reads as a blank grey slab with no sense of scale —
+## which also makes it hard to judge *how tall* the thing is. A couple of recessed
+## seams give the face a unit of measure. Non-colliding and slightly proud of the
+## surface, so they cannot z-fight with it.
+func _add_face_seams(from_x: float, to_x: float, top_y: float, thickness: float) -> void:
+	const SEAM_SPACING: float = 1.1
+	var width: float = to_x - from_x
+	var offset: float = SEAM_SPACING
+	while offset < thickness - 0.25:
+		var seam: BoxBlock = block(
+			Vector3(from_x + width * 0.5, top_y - offset, SURFACE_FRONT_Z + 0.06),
+			Vector3(width - 0.1, 0.07, 0.05),
+			SurfaceLibrary.Kind.DARK
+		)
+		seam.solid = false
+		offset += SEAM_SPACING
 
 
 ## An obstacle sitting on a deck: `height` tall, `depth_x` long, starting at
@@ -172,6 +196,105 @@ func obstacle(
 		(PROP_FRONT_Z + PROP_BACK_Z) * 0.5
 	)
 	return block(centre, Vector3(depth_x, height, depth), kind, true)
+
+
+# ------------------------------------------------------------------- prop kit
+
+## Places a piece of **scenery** from the environment kit.
+##
+## Scenery never collides and always sits behind the play plane. `depth` is how far
+## back, and it drives both the position and the automatic value fade in
+## `PropLibrary` — so pushing a prop back for visual interest also guarantees it
+## stops competing with the runner's silhouette.
+func scenery(
+	kind: String,
+	x: float,
+	ground_y: float,
+	depth: float = 4.0,
+	yaw_degrees: float = 0.0,
+	prop_scale: float = 1.0
+) -> Node3D:
+	var node: Node3D = PropLibrary.create(kind, depth)
+	if node == null:
+		return null
+	node.position = Vector3(x, ground_y, -depth)
+	node.rotation.y = deg_to_rad(yaw_degrees)
+	node.scale = Vector3.ONE * prop_scale
+	spawn(node)
+	return node
+
+
+## Places a piece of **furniture**: a detailed prop mesh in the play plane, with a
+## separate coarse collision box sized to the gameplay dimensions.
+##
+## Two objects on purpose. Gameplay collision stays axis-aligned, coarse and
+## predictable; the visual mesh can be as detailed as it likes. That separation is
+## what stops "I clearly cleared that" complaints, and it means a prop can be
+## re-modelled without retesting traversal.
+##
+## `collide_height` and `collide_depth_x` are the numbers the movement system
+## actually sees, so they are what the beat is designed around — the mesh follows.
+func furniture(
+	kind: String,
+	x: float,
+	ground_y: float,
+	collide_height: float,
+	collide_depth_x: float,
+	surface: SurfaceLibrary.Kind = SurfaceLibrary.Kind.METAL
+) -> BoxBlock:
+	var block_body: BoxBlock = obstacle(
+		x - collide_depth_x * 0.5, collide_depth_x, ground_y, collide_height, surface
+	)
+	# The collision box is invisible; the prop provides the visuals.
+	var mesh: MeshInstance3D = block_body.get_node_or_null("Mesh") as MeshInstance3D
+	if mesh != null:
+		mesh.visible = false
+
+	var node: Node3D = PropLibrary.create(kind, 0.0)
+	if node != null:
+		node.position = Vector3(x, ground_y, (PROP_FRONT_Z + PROP_BACK_Z) * 0.5)
+		spawn(node)
+	return block_body
+
+
+## An overhead obstruction leaving `clearance` metres of headroom — a slide-under.
+##
+## The duct prop is modelled with its underside at the origin, so it is positioned
+## directly by the clearance it leaves. Clearance is the only dimension gameplay
+## cares about, so it is the one the API takes.
+func overhead(
+	x: float,
+	ground_y: float,
+	clearance: float,
+	length: float = 3.0
+) -> BoxBlock:
+	var thickness: float = 0.66
+	var block_body: BoxBlock = block(
+		Vector3(x, ground_y + clearance + thickness * 0.5, (PROP_FRONT_Z + PROP_BACK_Z) * 0.5),
+		Vector3(length, thickness, PROP_FRONT_Z - PROP_BACK_Z),
+		SurfaceLibrary.Kind.METAL,
+		true
+	)
+	var mesh: MeshInstance3D = block_body.get_node_or_null("Mesh") as MeshInstance3D
+	if mesh != null:
+		mesh.visible = false
+
+	var node: Node3D = PropLibrary.create("duct_section", 0.0)
+	if node != null:
+		node.position = Vector3(x, ground_y + clearance, (PROP_FRONT_Z + PROP_BACK_Z) * 0.5)
+		node.scale = Vector3(length / 3.0, 1.0, 1.0)
+		spawn(node)
+
+	# Support legs, behind the play plane so they never obstruct the runner.
+	for side_x: float in [x - length * 0.5 + 0.3, x + length * 0.5 - 0.3]:
+		var leg: BoxBlock = block(
+			Vector3(side_x, ground_y + (clearance + thickness) * 0.5, -2.4),
+			Vector3(0.2, clearance + thickness, 0.22),
+			SurfaceLibrary.Kind.TRIM
+		)
+		leg.solid = false
+
+	return block_body
 
 
 ## The finish line, with its beacon, at `x` standing on `ground_y`.

@@ -5,6 +5,67 @@ All notable progress, recorded per playable demo. Newest first.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 Every entry corresponds to a commit on `main` that produced a working build.
 
+## Demo 0.4 — modular environment kit — 2026-09-22
+
+Level 01 is dressed. 13 procedural props, 1492 triangles total, 140 KB — and not
+one gameplay dimension changed in the process.
+
+### Added
+
+- `blender/scripts/kit_common.py` — mesh primitives (box, tapered cylinder, open
+  frame) built from raw vertex/face lists rather than `bpy.ops`, because operator
+  modelling depends on selection state and makes a long generation script fragile
+  in exactly the way a reproducible pipeline must not be.
+- `blender/scripts/build_kit.py` — 13 props, each a separate GLB:
+  - **furniture**, sized against the movement profile so the kit and the
+    controller agree by construction: AC unit (0.9 m low vault), crate (0.8 m),
+    transformer cabinet (1.45 m high vault), duct section (slide-under).
+  - **scenery**: vent stack, pipe run, railing, scaffold bay, water tank, antenna
+    mast, billboard, roof door, skylight.
+  - Open frames rather than panels for railings, scaffolding and masts, so they
+    read as structure and not as walls the runner might have to deal with.
+- `PropLibrary` — loads the kit, maps its intent-named materials onto
+  `SurfaceLibrary` so props share the level palette and batch with block geometry,
+  and **fades every prop toward the haze colour in proportion to its depth**.
+- `Level.scenery()`, `Level.furniture()` and `Level.overhead()`.
+- Panel seams on tall riser faces. A flush riser's front face is a large flat
+  rectangle aimed at the camera; undressed it read as a blank slab with no sense of
+  scale, which also made its height hard to judge.
+
+### Design notes
+
+**Props are decoration; `BoxBlock` is collision.** `furniture()` places a coarse
+axis-aligned collision box and a detailed mesh over it, and hides the box's own
+visual. Gameplay collision stays predictable and a prop can be re-modelled without
+retesting traversal. The proof this held: after dressing the entire level, the
+autopilot's completion time was **23.13 s — identical to the frame, with identical
+state counts**, before and after.
+
+**Depth fade is a gameplay rule, not an art flourish.** A prop pushed back for
+visual depth automatically *becomes* background, so it can never compete with the
+runner's silhouette. There is also a hard floor (`MINIMUM_SCENERY_FADE`) applied to
+any prop behind the play plane however close, because a depth-proportional fade
+barely touched a railing two metres back — and a near-black railing running
+horizontally through the runner's torso at body height merged with the figure.
+Scenery is never part of the foreground palette.
+
+### Fixed
+
+- Skylight glazing read as a glowing pool of water; emission energy more than
+  halved. A bright saturated patch on the walking surface competes with the
+  obstacles the player is trying to pick out.
+- Scenery no longer casts shadows: at this sun angle props behind the play plane
+  threw long shadows across the walking surface, adding noise exactly where the
+  ground needs to be readable.
+
+### Verified
+
+- Measured value structure: walking surface 0.475 — the brightest band in frame;
+  sky, backdrop and scenery 0.20–0.31; only 0.4% of pixels below 0.1 luminance, so
+  near-black belongs to the runner alone. Contrast range 0.84.
+- Autopilot: 244 m, 23.13 s, all states exercised, unchanged by dressing.
+- Web export clean, total build unchanged at 39 MB.
+
 ## Demo 0.3 — procedural character + skeletal animation — 2026-09-22
 
 The placeholder box rig is gone. The runner is now a skinned mesh generated

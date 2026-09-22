@@ -87,12 +87,16 @@ static func _build(kind: Kind) -> StandardMaterial3D:
 			mat.roughness = 0.9
 			mat.metallic = 0.05
 		Kind.GLASS:
-			mat.albedo_color = Color(0.14, 0.20, 0.28)
-			mat.roughness = 0.18
-			mat.metallic = 0.75
+			# Restrained. Glazing is the only emissive surface in the kit, and at a
+			# higher energy a skylight read as a glowing pool of water rather than a
+			# window — a bright saturated patch on the walking surface competes with
+			# the obstacles the player is trying to pick out.
+			mat.albedo_color = Color(0.13, 0.17, 0.225)
+			mat.roughness = 0.3
+			mat.metallic = 0.5
 			mat.emission_enabled = true
-			mat.emission = Color(0.30, 0.46, 0.62)
-			mat.emission_energy_multiplier = 0.35
+			mat.emission = Color(0.26, 0.38, 0.5)
+			mat.emission_energy_multiplier = 0.16
 		Kind.HAZARD:
 			mat.albedo_color = Color(0.72, 0.13, 0.12)
 			mat.roughness = 0.7

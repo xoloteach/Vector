@@ -40,6 +40,29 @@ grep -E '^\[build_runner\]' "$LOG" | sed 's/^/  /'
 [ -s "$CHAR_DIR/runner.glb" ] || die "runner.glb was not written"
 ok "runner.glb  $(du -h "$CHAR_DIR/runner.glb" | cut -f1)"
 
+# --- environment kit ----------------------------------------------------------
+PROP_DIR="$GAME_DIR/assets/props"
+mkdir -p "$PROP_DIR"
+
+step "Building environment kit"
+KIT_LOG="$LOG_DIR/build_kit.log"
+set +e
+blender --background --factory-startup \
+  --python "$REPO_ROOT/blender/scripts/build_kit.py" \
+  -- --out "$PROP_DIR" >"$KIT_LOG" 2>&1
+kit_status=$?
+set -e
+
+if ! grep -q '^BUILD_KIT: DONE' "$KIT_LOG"; then
+  tail -40 "$KIT_LOG" >&2
+  die "kit build failed (exit $kit_status) — see $KIT_LOG"
+fi
+grep -E '^\[build_kit\]' "$KIT_LOG" | sed 's/^/  /'
+
+prop_count=$(ls -1 "$PROP_DIR"/*.glb 2>/dev/null | wc -l)
+[ "$prop_count" -gt 0 ] || die "no props were written"
+ok "$prop_count props  $(du -sh "$PROP_DIR" | cut -f1)"
+
 # --- reimport so Godot picks up the new meshes --------------------------------
 step "Refreshing Godot import cache"
 GODOT="$(find_godot)"
