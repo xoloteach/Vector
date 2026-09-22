@@ -37,3 +37,6 @@ Thumbs.db
 *.swp
 .idea/
 .vscode/
+
+# playwright installed on demand by scripts/test_web.sh
+package.json

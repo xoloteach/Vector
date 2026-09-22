@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="MovementProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/core/movement_profile.gd" id="1_profile"]
+
+[resource]
+script = ExtResource("1_profile")
+max_run_speed = 11.5
+ground_acceleration = 60.0
+ground_turn_deceleration = 90.0
+ground_friction = 38.0
+idle_speed_threshold = 0.6
+gravity = 34.0
+fall_gravity_multiplier = 1.45
+max_fall_speed = 42.0
+jump_height = 2.45
+run_jump_height_bonus = 0.55
+air_control = 0.45
+air_friction = 2.0
+coyote_time = 0.13
+jump_buffer_time = 0.14
+jump_cut_factor = 0.45
+step_up_height = 0.42
+hard_landing_speed = 26.0
+lethal_landing_speed = 40.0
+hard_landing_speed_keep = 0.45
+hard_landing_recovery = 0.28
+kill_plane_y = -30.0

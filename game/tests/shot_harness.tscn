@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/shot_harness.gd" id="s_shots"]
+
+[node name="ShotHarness" type="Node"]
+script = ExtResource("s_shots")

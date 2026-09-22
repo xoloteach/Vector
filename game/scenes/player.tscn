@@ -1,0 +1,60 @@
+[gd_scene load_steps=14 format=3]
+
+[ext_resource type="Script" path="res://src/player/player.gd" id="s_player"]
+[ext_resource type="Script" path="res://src/player/state_machine.gd" id="s_machine"]
+[ext_resource type="Script" path="res://src/player/sensors/parkour_sensor.gd" id="s_sensor"]
+[ext_resource type="Script" path="res://src/player/placeholder_runner.gd" id="s_runner"]
+[ext_resource type="Script" path="res://src/player/states/idle_state.gd" id="s_idle"]
+[ext_resource type="Script" path="res://src/player/states/run_state.gd" id="s_run"]
+[ext_resource type="Script" path="res://src/player/states/jump_state.gd" id="s_jump"]
+[ext_resource type="Script" path="res://src/player/states/fall_state.gd" id="s_fall"]
+[ext_resource type="Script" path="res://src/player/states/land_state.gd" id="s_land"]
+[ext_resource type="Script" path="res://src/player/states/hard_landing_state.gd" id="s_hard"]
+[ext_resource type="Script" path="res://src/player/states/death_state.gd" id="s_death"]
+[ext_resource type="Resource" path="res://resources/default_movement.tres" id="r_profile"]
+
+[sub_resource type="CapsuleShape3D" id="cap_body"]
+radius = 0.34
+height = 1.8
+
+[node name="Player" type="CharacterBody3D" groups=["player"]]
+collision_layer = 2
+collision_mask = 5
+script = ExtResource("s_player")
+profile = ExtResource("r_profile")
+
+[node name="Collision" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("cap_body")
+
+[node name="Visual" type="Node3D" parent="."]
+
+[node name="Runner" type="Node3D" parent="Visual"]
+script = ExtResource("s_runner")
+
+[node name="ParkourSensor" type="Node3D" parent="."]
+script = ExtResource("s_sensor")
+
+[node name="StateMachine" type="Node" parent="."]
+script = ExtResource("s_machine")
+
+[node name="Idle" type="Node" parent="StateMachine"]
+script = ExtResource("s_idle")
+
+[node name="Run" type="Node" parent="StateMachine"]
+script = ExtResource("s_run")
+
+[node name="Jump" type="Node" parent="StateMachine"]
+script = ExtResource("s_jump")
+
+[node name="Fall" type="Node" parent="StateMachine"]
+script = ExtResource("s_fall")
+
+[node name="Land" type="Node" parent="StateMachine"]
+script = ExtResource("s_land")
+
+[node name="HardLanding" type="Node" parent="StateMachine"]
+script = ExtResource("s_hard")
+
+[node name="Death" type="Node" parent="StateMachine"]
+script = ExtResource("s_death")

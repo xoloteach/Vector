@@ -1,0 +1,75 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scenes/levels/level_01.gd" id="s_level"]
+[ext_resource type="Script" path="res://src/camera/parkour_camera.gd" id="s_camera"]
+[ext_resource type="Script" path="res://src/level/scene_lighting.gd" id="s_lighting"]
+[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="p_player"]
+
+[sub_resource type="ProceduralSkyMaterial" id="sky_mat"]
+sky_top_color = Color(0.09, 0.13, 0.24, 1)
+sky_horizon_color = Color(0.38, 0.32, 0.36, 1)
+sky_curve = 0.18
+ground_bottom_color = Color(0.05, 0.06, 0.09, 1)
+ground_horizon_color = Color(0.3, 0.26, 0.3, 1)
+sun_angle_max = 24.0
+sun_curve = 0.12
+
+[sub_resource type="Sky" id="sky"]
+sky_material = SubResource("sky_mat")
+
+[sub_resource type="Environment" id="env"]
+background_mode = 2
+sky = SubResource("sky")
+ambient_light_source = 3
+ambient_light_color = Color(0.34, 0.41, 0.56, 1)
+ambient_light_sky_contribution = 0.55
+ambient_light_energy = 0.55
+tonemap_mode = 3
+tonemap_white = 3.0
+glow_enabled = true
+glow_intensity = 0.35
+glow_strength = 0.9
+glow_bloom = 0.06
+glow_blend_mode = 1
+glow_hdr_threshold = 1.05
+fog_enabled = true
+fog_light_color = Color(0.26, 0.31, 0.42, 1)
+fog_light_energy = 1.0
+fog_sun_scatter = 0.22
+fog_density = 0.0075
+fog_sky_affect = 0.35
+fog_height = -20.0
+fog_height_density = 0.015
+adjustment_enabled = true
+adjustment_brightness = 1.02
+adjustment_contrast = 1.08
+adjustment_saturation = 1.05
+
+[node name="Level01" type="Node3D"]
+script = ExtResource("s_level")
+player = NodePath("Player")
+camera = NodePath("Camera")
+spawn_point = NodePath("Spawn")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("env")
+
+[node name="Lighting" type="Node3D" parent="."]
+script = ExtResource("s_lighting")
+
+[node name="Spawn" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)
+
+[node name="Player" parent="." instance=ExtResource("p_player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)
+
+[node name="Camera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 11)
+fov = 42.0
+near = 0.1
+far = 400.0
+script = ExtResource("s_camera")
+; Framing values are deliberately NOT overridden here. They live as defaults on
+; parkour_camera.gd so there is one place to tune them. An earlier version set
+; them in this scene too, and a whole round of framing fixes had no effect
+; because the stale scene values kept winning.
