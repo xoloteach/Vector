@@ -20,8 +20,12 @@ something is behind you.
 
 | Where | Link |
 | --- | --- |
-| Browser (GitHub Pages) | https://xoloteach.github.io/Vector/ |
+| Browser (GitHub Pages) | https://xoloteach.github.io/Vector/ — *requires Pages to be enabled once; see [`TODO.md`](TODO.md)* |
+| CI artifact | `roofline-web-build` on any successful Actions run |
 | Local export | `exports/web/index.html` (serve over HTTP, see below) |
+
+**Useful URL flags:** `?bot=1` hands the game to the autopilot, `?touch=0` / `?touch=1`
+force the on-screen controls off or on, `?quality=low` starts in the Performance preset.
 
 ---
 
@@ -82,26 +86,51 @@ game/                     Godot 4 project (the game itself)
   project.godot
   export_presets.cfg      Web export preset (checked in, reproducible)
   src/
-    autoload/             Singletons: run state, audio bus, settings
+    autoload/game.gd      Run state, scene flow, settings
+    core/                 Main router, MovementProfile resource
     player/               CharacterBody3D controller
-      states/             One file per movement state (state machine)
-      sensors/            Raycast/shapecast parkour probes
-    camera/               Framing rig (look-ahead, speed zoom, shake)
-    level/                Level runtime, checkpoints, triggers, kit pieces
-    chase/                Pursuer AI and chase pressure director
-    fx/                   Particles, motion streaks, post effects
-    ui/                   Title, HUD, pause, death, level complete
+      states/             One file per movement state (13 states)
+      sensors/            All raycasting — the only place that probes the world
+      traversal_planner   Decides *which* parkour move a situation calls for
+      runner_animator     State -> pose mapping, blended, drives the Skeleton3D
+    camera/               Framing rig: look-ahead, aspect adaptation, chase response
+    level/                Level runtime, procedural kit placement, materials
+    chase/                Pursuer motion and the chase-pressure director
+    fx/                   Particles and the motion-streak overlay
+    audio/                One director listening to gameplay signals
+    ui/                   Theme, title, settings, pause, results, touch controls
+    debug/autopilot.gd    The bot that plays the game (shipped, not test-only)
+  tests/                  Headless harnesses: autopilot, parse, shots, poses, UI
   scenes/                 Composed scenes and levels
-  assets/                 Imported meshes, textures, audio, fonts
+  assets/                 Generated meshes and audio
 
-blender/scripts/          Headless Blender Python asset generators
-                          (character, rig, environment kit) — the art is
-                          reproducible from source, not hand-saved .blend files
+blender/scripts/          Headless Blender Python generators. All art is
+                          reproducible from source; a hand-saved .blend is a bug.
+audio/scripts/            Software synthesiser + generator. All audio is original
+                          and synthesised — no samples, no recordings.
 exports/web/              Committed browser build (what GitHub Pages serves)
-scripts/                  Dev tooling: validate, export, screenshot, test
-docs/                     Environment, recovery, design and review notes
-tools/                    Local-only helpers (not required to build)
+scripts/                  Dev tooling — see below
+docs/                     Environment, recovery, and milestone critic reviews
 ```
+
+### Tooling
+
+The verification tooling is a deliberate part of the project, not scaffolding. Most
+bugs in this codebase were found by these rather than by reading code.
+
+| Script | What it does |
+| --- | --- |
+| `validate.sh` | Imports, **parses every script inside a running project**, boots the main scene |
+| `test_headless.sh` | A bot plays the level end to end, **and** a counter-test verifies a stalled runner is caught. Either test alone is worthless |
+| `export_web.sh` | Exports, then verifies the artefacts — including rejecting a threads-enabled build |
+| `test_web.sh` | Drives the real export in Chromium/WebGL2 with the bot at the controls |
+| `test_mobile.sh` | Genuine multi-touch across 5 phone/tablet profiles via CDP |
+| `test_ui.sh` | Drives the menus in a browser |
+| `shots.sh` | Deterministic in-engine frames in seconds, plus render-cost telemetry |
+| `pose_sheet.sh` | The character isolated and large, **with numeric bone landmarks** |
+| `ui_sheet.sh` | Every screen at 4 viewport sizes, failing on geometry problems |
+| `analyse_frame.py` | Banded luminance and histogram of a frame — turns "looks flat" into numbers |
+| `build_assets.sh` | Regenerates all Blender art |
 
 **Key design decision — why 3D:** the game plays on a 2D plane (movement is
 locked to X/Y, Z is fixed) but renders in Godot's 3D renderer. That buys real
@@ -166,6 +195,24 @@ Source → GitHub Actions**. No code changes are needed.
 | [`TODO.md`](TODO.md) | Current milestone, blockers, bugs, next features |
 | [`CHANGELOG.md`](CHANGELOG.md) | Progress per playable demo |
 | [`ATTRIBUTION.md`](ATTRIBUTION.md) | Licenses for every external asset |
+
+## Performance
+
+Measured across the whole level with `./scripts/shots.sh`:
+
+| Metric | Peak |
+| --- | --- |
+| Draw calls | **51** |
+| Primitives | **7,544** |
+| Character | 1,100 triangles, 20 bones |
+| Environment kit | 13 props, 1,492 triangles total |
+| Audio | 812 KB, 22 files |
+| Total build | 39 MB (essentially all engine WASM; ~10 MB gzipped) |
+
+Draw calls and primitive counts are reported rather than frame rate because they are
+hardware-independent — a software-rendered frame rate says nothing about a real device.
+Frame rate on real GPU hardware is the one thing still unmeasured, and is tracked as
+the top item in [`TODO.md`](TODO.md).
 
 ## License
 

@@ -102,7 +102,7 @@ extends Resource
 @export var hard_landing_recovery: float = 0.28
 
 ## Any fall below this world Y kills the runner, regardless of geometry.
-@export var kill_plane_y: float = -30.0
+@export var kill_plane_y: float = -90.0
 
 ## Impact speed at or above which a well-timed slide input becomes a roll.
 ## Slightly below the hard-landing threshold, so the skilful option is available

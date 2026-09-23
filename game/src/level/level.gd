@@ -60,6 +60,10 @@ var fx: RunnerFX
 ## X position of the finish line, filled in by `build_course()`.
 var course_length: float = 0.0
 
+## Lowest walkable surface the course built. Used to place the void kill volume, so a
+## level that descends does not have to remember to move it.
+var _lowest_surface: float = 0.0
+
 var _geometry_root: Node3D
 
 
@@ -184,6 +188,7 @@ func deck(
 		top_y - thickness * 0.5,
 		(SURFACE_FRONT_Z + SURFACE_BACK_Z) * 0.5
 	)
+	_lowest_surface = minf(_lowest_surface, top_y)
 	var body: BoxBlock = block(centre, Vector3(width, thickness, depth), kind)
 	# Decks do not cast. They are far too wide for the shadow atlas to resolve and
 	# self-shadow their own front faces into a visible diagonal weave. They still
@@ -344,15 +349,24 @@ func finish(x: float, ground_y: float) -> FinishLine:
 
 # ------------------------------------------------------------------- lifecycle
 
-## A wide, deep kill volume under the whole course, so falling off anywhere ends
-## the run promptly instead of after a long silent drop.
+## A wide, deep kill volume under the whole course, so falling off anywhere ends the
+## run promptly instead of after a long silent drop.
+##
+## Positioned from the **lowest surface the course actually built**, not a constant.
+## It was hardcoded at y = -18 when the lowest deck was at -6; extending the level with
+## a descent to -16 put the final deck inside the kill volume, and landing correctly on
+## it killed the player. A level that descends must not have to remember to move its own
+## kill plane.
 func _add_void_killzone() -> void:
 	var void_zone := KillZone.new()
 	void_zone.name = "VoidKillZone"
 	void_zone.reason = Game.FAIL_FELL
-	var span: float = maxf(course_length, 200.0) + 200.0
-	void_zone.size = Vector3(span, 8.0, 40.0)
-	void_zone.position = Vector3(span * 0.5 - 100.0, -18.0, 0.0)
+	var span: float = maxf(course_length, 200.0) + 240.0
+	# Deep enough below the lowest surface that a survivable fall is never caught by it,
+	# and thick enough that nothing can tunnel through at terminal velocity.
+	var top: float = _lowest_surface - 14.0
+	void_zone.size = Vector3(span, 30.0, 40.0)
+	void_zone.position = Vector3(span * 0.5 - 120.0, top - 15.0, 0.0)
 	spawn(void_zone)
 
 

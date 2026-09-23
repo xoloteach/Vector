@@ -40,12 +40,24 @@ const START_Y: float = 0.0
 func build_course() -> void:
 	spawn(SkylineBackdrop.new())
 
+	# --- Act I: teaching. Each move introduced alone, then combined. ------------
 	_beat_run_up()
 	_beat_first_gap_and_vaults()
 	_beat_rise_and_slide()
 	_beat_drop_and_wide_gap()
 	_beat_mantles_and_wall()
 	_beat_committed_gap_and_roll()
+
+	# --- Act II: rhythm. Everything taught, now at pace and in combination. -----
+	_beat_vault_chain()
+	_beat_stagger_climb()
+	_beat_duct_run()
+	_beat_descent()
+
+	# --- Act III: pressure. The hardest shapes, then the run home. --------------
+	_beat_tight_sequence()
+	_beat_wall_ladder()
+	_beat_final_sprint()
 
 
 # === Beat 1: run-up =========================================================
@@ -188,9 +200,172 @@ func _beat_committed_gap_and_roll() -> void:
 	scenery("water_tank", 240.0, START_Y - 6.0, 9.0)
 	scenery("billboard", 228.0, START_Y - 4.0, 18.0)
 
-	# Finish, set well back from the drop so landing and finishing are two separate
-	# moments rather than one confusing one.
-	finish(244.0, START_Y - 6.0)
+
+# ===========================================================================
+# ACT II — rhythm
+# ===========================================================================
+#
+# Everything is taught by now. This act stops explaining and starts asking for
+# execution: the same moves arrive closer together, in combinations, with less room
+# to recover between them. The pursuer is also fully established by here, so the cost
+# of hesitating has become concrete rather than theoretical.
+
+
+## Three vaults in quick succession, then a gap taken straight out of the third.
+##
+## Spacing is the whole design. 7 m between obstacles is just enough to re-accelerate
+## after a high vault's speed cost, so the chain is survivable but punishes stalling —
+## and the gap immediately after means the third vault has to be carried, not recovered
+## from.
+func _beat_vault_chain() -> void:
+	deck(252.0, 296.0, START_Y - 6.0)
+	parapet(252.0, 296.0, START_Y - 6.0)
+	_rail_run(253.0, 295.0, START_Y - 6.0)
+
+	furniture("ac_unit", 262.0, START_Y - 6.0, 0.95, 1.3)
+	furniture("crate", 269.5, START_Y - 6.0, 0.8, 1.1, SurfaceLibrary.Kind.CONCRETE)
+	furniture("transformer", 277.5, START_Y - 6.0, 1.45, 1.6)
+	furniture("ac_unit", 286.0, START_Y - 6.0, 0.9, 1.25)
+
+	scenery("scaffold", 258.0, START_Y - 6.0, 6.5)
+	scenery("vent_stack", 274.0, START_Y - 6.0, 3.4)
+	scenery("water_tank", 292.0, START_Y - 6.0, 8.5)
+	scenery("billboard", 280.0, START_Y - 4.0, 18.0)
+	scenery("antenna_mast", 266.0, START_Y - 6.0, 12.5)
+
+	# 6.5 m, taken out of the last vault.
+	deck(302.5, 330.0, START_Y - 6.0)
+	parapet(302.5, 330.0, START_Y - 6.0)
+	_rail_run(303.5, 329.0, START_Y - 6.0)
+	scenery("roof_door", 312.0, START_Y - 6.0, 4.8)
+	scenery("skylight", 322.0, START_Y - 6.0, 3.2)
+
+
+## A staggered ascent: mantle, gap, mantle, gap. Alternating move types so neither
+## becomes automatic.
+func _beat_stagger_climb() -> void:
+	deck(330.0, 342.0, START_Y - 4.5, 2.0)
+	_rail_run(331.0, 341.0, START_Y - 4.5)
+
+	deck(348.0, 360.0, START_Y - 3.0)
+	_rail_run(349.0, 359.0, START_Y - 3.0)
+
+	deck(360.0, 372.0, START_Y - 1.5, 2.0)
+	_rail_run(361.0, 371.0, START_Y - 1.5)
+
+	deck(378.5, 398.0, START_Y)
+	parapet(378.5, 398.0, START_Y)
+	_rail_run(379.5, 397.0, START_Y)
+
+	scenery("pipe_run", 336.0, START_Y - 4.5, 3.2)
+	scenery("vent_stack", 355.0, START_Y - 3.0, 3.4)
+	scenery("scaffold", 366.0, START_Y - 1.5, 6.5)
+	scenery("water_tank", 390.0, START_Y, 9.0)
+	scenery("antenna_mast", 384.0, START_Y, 13.0)
+
+
+## Two ducts with a vault between them: slide, stand, vault, slide. The transitions
+## are the difficulty, not any single move.
+func _beat_duct_run() -> void:
+	overhead(384.0, START_Y, 1.0, 3.4)
+	furniture("crate", 390.5, START_Y, 0.85, 1.1, SurfaceLibrary.Kind.CONCRETE)
+
+	deck(398.0, 432.0, START_Y)
+	parapet(398.0, 432.0, START_Y)
+	_rail_run(399.0, 431.0, START_Y)
+	overhead(404.0, START_Y, 1.0, 4.2)
+	furniture("ac_unit", 413.0, START_Y, 0.9, 1.25)
+	overhead(421.0, START_Y, 1.05, 3.6)
+
+	scenery("billboard", 410.0, START_Y + 1.0, 17.0)
+	scenery("skylight", 427.0, START_Y, 3.2)
+	scenery("roof_door", 400.0, START_Y, 5.0)
+
+
+## A long descent in three stages, each landing faster than the last. The final drop
+## crosses the roll threshold, so the act ends on the skill it taught last.
+func _beat_descent() -> void:
+	deck(438.0, 462.0, START_Y - 3.0)
+	parapet(438.0, 462.0, START_Y - 3.0)
+	_rail_run(439.0, 461.0, START_Y - 3.0)
+
+	deck(468.0, 490.0, START_Y - 7.5)
+	parapet(468.0, 490.0, START_Y - 7.5)
+	_rail_run(469.0, 489.0, START_Y - 7.5)
+
+	# 8.5 m: above the roll threshold. Roll it or lose most of your speed.
+	deck(490.0, 520.0, START_Y - 16.0)
+	parapet(490.0, 520.0, START_Y - 16.0)
+	_rail_run(496.0, 519.0, START_Y - 16.0)
+
+	scenery("scaffold", 446.0, START_Y - 3.0, 7.0)
+	scenery("vent_stack", 458.0, START_Y - 3.0, 3.4)
+	scenery("water_tank", 480.0, START_Y - 7.5, 8.0)
+	scenery("antenna_mast", 474.0, START_Y - 7.5, 12.0)
+	scenery("roof_door", 504.0, START_Y - 16.0, 4.8)
+	scenery("billboard", 512.0, START_Y - 14.0, 19.0)
+
+
+# ===========================================================================
+# ACT III — pressure
+# ===========================================================================
+
+
+## The tightest sequence in the level: vault, immediate gap, immediate mantle. There is
+## no recovery room, which is the point — this is the difficulty peak.
+func _beat_tight_sequence() -> void:
+	furniture("transformer", 508.0, START_Y - 16.0, 1.45, 1.6)
+	furniture("ac_unit", 515.5, START_Y - 16.0, 0.95, 1.3)
+
+	# 5.5 m gap straight into a 1.5 m riser.
+	deck(525.5, 536.0, START_Y - 14.5, 2.0)
+	_rail_run(526.5, 535.0, START_Y - 14.5)
+
+	deck(542.0, 556.0, START_Y - 13.0, 2.0)
+	_rail_run(543.0, 555.0, START_Y - 13.0)
+	furniture("crate", 551.0, START_Y - 13.0, 0.8, 1.1, SurfaceLibrary.Kind.CONCRETE)
+
+	scenery("pipe_run", 530.0, START_Y - 14.5, 3.2)
+	scenery("scaffold", 548.0, START_Y - 13.0, 6.5)
+
+
+## Two wall runs back to back, the second taller than the first. Only reachable with
+## speed intact, so it is the level's final test of whether the player has been
+## carrying momentum or merely surviving.
+func _beat_wall_ladder() -> void:
+	deck(556.0, 572.0, START_Y - 10.0, 3.6)
+	parapet(556.0, 572.0, START_Y - 10.0)
+	_rail_run(560.0, 571.0, START_Y - 10.0)
+
+	deck(572.0, 592.0, START_Y - 6.4, 3.9)
+	parapet(572.0, 592.0, START_Y - 6.4)
+	_rail_run(576.0, 591.0, START_Y - 6.4)
+	furniture("ac_unit", 585.0, START_Y - 6.4, 0.9, 1.25)
+
+	scenery("antenna_mast", 566.0, START_Y - 10.0, 11.0)
+	scenery("water_tank", 588.0, START_Y - 6.4, 7.5)
+	scenery("billboard", 578.0, START_Y - 4.0, 18.0)
+
+
+## The run home: a wide gap, a long clear deck, and the finish. Deliberately generous
+## after the wall ladder — a level should end on a sprint the player wins, not on one
+## last chance to fail.
+func _beat_final_sprint() -> void:
+	deck(599.0, 648.0, START_Y - 6.4)
+	parapet(599.0, 648.0, START_Y - 6.4)
+	_rail_run(600.0, 647.0, START_Y - 6.4)
+
+	furniture("ac_unit", 612.0, START_Y - 6.4, 0.9, 1.25)
+	overhead(624.0, START_Y - 6.4, 1.05, 3.4)
+
+	scenery("roof_door", 606.0, START_Y - 6.4, 5.0)
+	scenery("skylight", 618.0, START_Y - 6.4, 3.2)
+	scenery("scaffold", 634.0, START_Y - 6.4, 7.0)
+	scenery("water_tank", 643.0, START_Y - 6.4, 9.0)
+	scenery("antenna_mast", 630.0, START_Y - 6.4, 13.0)
+	scenery("billboard", 640.0, START_Y - 4.5, 17.0)
+
+	finish(640.0, START_Y - 6.4)
 
 
 # ---------------------------------------------------------------- kit shorthand

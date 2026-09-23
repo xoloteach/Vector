@@ -63,8 +63,20 @@ any commercial game. The reference genre informs *feel*, never content.
 ./scripts/serve_web.sh       # local HTTP server for the export
 ./scripts/test_web.sh        # real Chromium/WebGL2 run, bot driving, screenshots
 ./scripts/test_mobile.sh     # touch controls across 5 phone/tablet form factors
-./scripts/shots.sh           # fast deterministic in-engine frames (seconds)
+./scripts/shots.sh           # fast deterministic frames + render-cost telemetry
+./scripts/pose_sheet.sh      # character isolated, with numeric bone landmarks
+./scripts/ui_sheet.sh        # every UI screen at 4 viewports, fails on geometry
+./scripts/test_ui.sh         # drives the menus in a real browser
+./scripts/build_assets.sh    # regenerate all Blender art
+python3 audio/scripts/build_audio.py --out game/assets/audio
+python3 scripts/analyse_frame.py <image.png>   # banded luminance + histogram
 ```
+
+**Measure, do not squint.** Every hard bug in this project was diagnosed by a number,
+after screenshots had already failed: `analyse_frame.py` found an inverted value ramp,
+the pose sheet's landmarks found a foot bone at head height, and `ui_sheet.sh` found
+menu text at 4.3 physical pixels. When something "looks wrong", reach for a measurement
+before reaching for a guess.
 
 Every one of these must exit non-zero on failure. If you make them lenient you
 have broken the only safety net.

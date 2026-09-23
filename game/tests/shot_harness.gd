@@ -34,6 +34,10 @@ const STATIONS: Array[Dictionary] = [
 	{"name": "f-mantle-steps", "x": 147.0, "y": -2.9},
 	{"name": "g-wall-face", "x": 169.0, "y": 0.1},
 	{"name": "h-final-deck", "x": 210.0, "y": 3.1},
+	{"name": "j-act2-vaults", "x": 265.0, "y": -5.4},
+	{"name": "k-act2-ducts", "x": 408.0, "y": 0.6},
+	{"name": "l-act3-walls", "x": 566.0, "y": -9.4},
+	{"name": "m-final-sprint", "x": 615.0, "y": -5.8},
 	{"name": "i-drop-edge", "x": 222.0, "y": 3.1},
 
 	# --- moves, mid-action ---
@@ -62,6 +66,8 @@ const STATIONS: Array[Dictionary] = [
 const LEVEL_PATH: String = "res://scenes/levels/level_01.tscn"
 
 var _out_dir: String = "res://../captures/shots"
+var _peak_draw_calls: int = 0
+var _peak_primitives: int = 0
 var _level: Level
 
 
@@ -123,6 +129,8 @@ func _shoot_all() -> void:
 
 		await RenderingServer.frame_post_draw
 
+		_report_render_cost(station["name"])
+
 		var image: Image = get_viewport().get_texture().get_image()
 		var label: String = "%s [%s]" % [station["name"], player.state_name()]
 		var path: String = "%s/%s.png" % [_out_dir, station["name"]]
@@ -137,6 +145,8 @@ func _shoot_all() -> void:
 		if ticks > 0:
 			print("      %s" % label)
 
+	print("")
+	print("peak cost: %d draw calls, %d primitives" % [_peak_draw_calls, _peak_primitives])
 	print("SHOTS: DONE (%d)" % written)
 	# Deferred so stdout flushes before teardown; a direct quit() swallowed the
 	# verdict line and made the wrapper report failure on a successful run.
@@ -163,6 +173,29 @@ func _place_drone(player: Player, offset: float) -> void:
 		player.global_position.y + _level.pursuer.hover_height,
 		player.plane_z
 	)
+
+
+## Reports the actual render cost of a frame.
+##
+## Draw calls and primitive counts are the performance numbers that matter for a browser
+## build, and unlike frame rate they are **hardware-independent** — a SwiftShader frame
+## rate says nothing about a real phone, but 300 draw calls says the same thing
+## everywhere. These are the figures to watch as the level and kit grow.
+func _report_render_cost(station_name: String) -> void:
+	var draw_calls: int = RenderingServer.get_rendering_info(
+		RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME
+	)
+	var primitives: int = RenderingServer.get_rendering_info(
+		RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME
+	)
+	var objects: int = RenderingServer.get_rendering_info(
+		RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME
+	)
+	_peak_draw_calls = maxi(_peak_draw_calls, draw_calls)
+	_peak_primitives = maxi(_peak_primitives, primitives)
+	print("      cost: %4d draw calls, %6d primitives, %4d objects" % [
+		draw_calls, primitives, objects
+	])
 
 
 ## Puts the runner back to a known state between stations, so one station's leftover

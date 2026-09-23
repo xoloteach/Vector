@@ -24,4 +24,4 @@ hard_landing_speed = 26.0
 lethal_landing_speed = 40.0
 hard_landing_speed_keep = 0.45
 hard_landing_recovery = 0.28
-kill_plane_y = -30.0
+kill_plane_y = -90.0
