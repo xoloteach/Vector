@@ -56,6 +56,39 @@ var sfx_volume: float = 0.9
 
 signal volumes_changed
 
+## Graphics quality.
+##
+## Exists because the browser target genuinely spans a phone to a desktop, and the two
+## expensive things in this scene are shadows and particles. Rather than a long list of
+## individual toggles nobody will understand, three presets that turn off the things
+## that actually cost frames.
+enum Quality { HIGH, BALANCED, PERFORMANCE }
+
+var quality: Quality = Quality.HIGH:
+	set(value):
+		quality = value
+		quality_changed.emit(value)
+
+signal quality_changed(level: Quality)
+
+## True when shadows should be rendered at the current quality level.
+func shadows_enabled() -> bool:
+	return quality != Quality.PERFORMANCE
+
+## True when particle effects should spawn.
+func particles_enabled() -> bool:
+	return quality != Quality.PERFORMANCE
+
+## Multiplier on the backdrop's parallax layer count, so a weak device draws fewer.
+func backdrop_layer_scale() -> float:
+	match quality:
+		Quality.PERFORMANCE:
+			return 0.5
+		Quality.BALANCED:
+			return 0.75
+		_:
+			return 1.0
+
 
 func _ready() -> void:
 	# The pause menu and death screen still need to process while the world is

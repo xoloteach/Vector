@@ -174,6 +174,13 @@ var _buttons: Array[TouchButton] = []
 var _touch_owner: Dictionary[int, TouchButton] = {}
 var _root: Control
 var _enabled: bool = false
+## Hidden because a menu is open, independently of whether touch is active.
+var _suppressed: bool = false
+
+## Mouse events arriving within this window of a real touch are assumed to be
+## Godot's touch emulation rather than an actual mouse.
+const EMULATED_MOUSE_WINDOW_MS: int = 900
+var _last_touch_msec: int = -100000
 
 
 func _ready() -> void:
@@ -241,10 +248,28 @@ func set_enabled(value: bool) -> void:
 	if _enabled == value:
 		return
 	_enabled = value
-	_root.visible = value
+	_refresh_visibility()
 	if not value:
 		_release_all()
 	enabled_changed.emit(value)
+
+
+## Hides the controls without changing whether touch is *active*.
+##
+## Used while a menu is open. Thumb controls have no business being drawn over a title
+## screen or a pause menu, and worse, their invisible padded hit areas sit on top of
+## the menu's own buttons and swallow taps meant for them.
+func set_suppressed(value: bool) -> void:
+	if _suppressed == value:
+		return
+	_suppressed = value
+	_refresh_visibility()
+	if value:
+		_release_all()
+
+
+func _refresh_visibility() -> void:
+	_root.visible = _enabled and not _suppressed
 
 
 func is_enabled() -> bool:
@@ -355,6 +380,11 @@ func _place(button: TouchButton, pos: Vector2, size: Vector2) -> void:
 # ----------------------------------------------------------------------- input
 
 func _input(event: InputEvent) -> void:
+	# While a menu is open the controls are not on screen, so they must not claim
+	# input either — otherwise their padded hit areas eat taps aimed at menu buttons.
+	if _suppressed:
+		return
+
 	if event is InputEventScreenTouch:
 		var touch: InputEventScreenTouch = event
 		# First real touch reveals the controls, covering platforms whose feature
@@ -368,11 +398,15 @@ func _input(event: InputEvent) -> void:
 			set_enabled(true)
 		elif not _enabled:
 			return
+		_last_touch_msec = Time.get_ticks_msec()
 		if touch.pressed:
 			_begin_touch(touch.index, touch.position)
 		else:
 			_end_touch(touch.index)
-		get_viewport().set_input_as_handled()
+		# Only claim the event if it actually hit one of our controls, so taps that
+		# miss still reach menus and buttons underneath.
+		if _touch_owner.has(touch.index) or not touch.pressed:
+			get_viewport().set_input_as_handled()
 		return
 
 	if event is InputEventScreenDrag and _enabled:
@@ -388,6 +422,17 @@ func _input(event: InputEvent) -> void:
 	# is off, so a genuine motion event cannot have come from a finger.
 	if not _enabled:
 		return
+
+	# Godot synthesises mouse events from touches (`emulate_mouse_from_touch`, on by
+	# default and needed so ordinary Buttons work under a finger). That means every
+	# tap also arrives as a mouse event, and treating those as "a real mouse is being
+	# used" made the controls hide themselves the instant they were touched.
+	#
+	# A short window after any genuine screen touch, mouse events are assumed to be
+	# emulated and ignored.
+	if Time.get_ticks_msec() - _last_touch_msec < EMULATED_MOUSE_WINDOW_MS:
+		return
+
 	if event is InputEventMouseMotion:
 		set_enabled(false)
 	elif event is InputEventKey or event is InputEventJoypadButton or event is InputEventMouseButton:

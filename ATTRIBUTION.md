@@ -51,7 +51,7 @@ part of the game, and art generated with Blender carries no GPL obligation.
 
 | Asset | Source | License |
 | --- | --- | --- |
-| _(none yet)_ | | |
+| All sound effects and music (22 files) | **Original** — synthesised from scratch by `audio/scripts/build_audio.py` using the software synthesiser in `audio/scripts/synth.py`. No samples, no recordings, no external audio of any kind was used or referenced. | MIT (this project) |
 
 ## Fonts
 

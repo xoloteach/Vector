@@ -41,6 +41,19 @@ func setup(player: Player) -> void:
 	player.rolled.connect(_on_rolled)
 
 
+## Turned off by the Performance quality preset. Particles are one of the two things
+## in this scene that actually cost frames on a weak device.
+var _enabled: bool = true
+
+
+func set_enabled(value: bool) -> void:
+	_enabled = value
+	if not value:
+		for emitter: CPUParticles3D in [_land, _slide, _vault, _scuff]:
+			if emitter != null:
+				emitter.emitting = false
+
+
 func _ready() -> void:
 	_land = _make_emitter("LandDust", 18, Color(0.72, 0.74, 0.8, 0.5), 0.13)
 	_slide = _make_emitter("SlideGrit", 26, Color(0.78, 0.76, 0.72, 0.42), 0.075)
@@ -108,6 +121,9 @@ func _process(_delta: float) -> void:
 	if _player == null:
 		return
 
+	if not _enabled:
+		return
+
 	# Slide grit follows the feet for as long as the slide lasts.
 	var sliding: bool = _player.state_name() == PlayerState.SLIDE
 	if sliding:
@@ -122,6 +138,8 @@ func _process(_delta: float) -> void:
 
 
 func _burst(emitter: CPUParticles3D, position: Vector3, strength: float) -> void:
+	if not _enabled:
+		return
 	emitter.global_position = position
 	emitter.initial_velocity_max = lerpf(1.4, 5.0, strength)
 	emitter.amount = int(lerpf(6.0, float(emitter.amount), maxf(0.3, strength)))

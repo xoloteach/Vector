@@ -5,6 +5,89 @@ All notable progress, recorded per playable demo. Newest first.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 Every entry corresponds to a commit on `main` that produced a working build.
 
+## Demo 0.7 — audio, title screen, game flow — 2026-09-22
+
+The game now has a front door, a pause menu, a results screen, and sound.
+
+### Added — audio (Phase 9)
+
+- `audio/scripts/synth.py` — a small software synthesiser: oscillators, sweeps,
+  AD(S)R envelopes, one- and two-pole filters, a travelling lowpass, a Schroeder
+  reverb, and loop crossfading. Standard library only, no numpy.
+- `audio/scripts/build_audio.py` — generates all 22 sounds: four footstep variants,
+  jump, soft and hard landings, slide, low and high vault, roll, wall scuff, ledge
+  catch, death, finish, drone hum, drone alert, wind, city, a music loop, and two UI
+  sounds. **812 KB total.**
+- `AudioDirector` — one place that listens to signals. No gameplay system knows audio
+  exists; `Player` emits `vaulted`, it does not play a sound.
+
+**Why synthesised rather than sourced CC0 samples.** It matches how every other
+asset here is made — a folder of downloaded WAVs would be the one part nobody could
+regenerate. It can be tuned (a footstep placed exactly under the gait, a rotor hum
+pitched not to fight the music). It is small. And licensing simply is not a question.
+
+**Footsteps are driven by distance travelled, not a timer.** A step fires every
+2.45 m of ground covered, so the footfall rate tracks speed exactly with no syncing
+to the animator, and stays correct if the movement profile is retuned.
+
+**Soft and hard landings differ in weight and length, not just level**, so a mistake
+is audible before the camera shake or the HUD reports it. The drone is the only sound
+allowed to demand attention, and earns it by being the thing that can kill you.
+
+### Added — UI and game flow (Phase 10)
+
+- `UITheme` — shared styling as factory functions. Every control clears the ~44 px
+  touch target with margin, because mobile is a first-class target and retrofitting
+  sizes never happens.
+- `TitleScreen` with controls and settings panels, **over a live attract-mode render
+  of the level** rather than a black rectangle.
+- `PauseMenu`, and `ResultsPanel` serving both death and completion. Each failure
+  gets the one piece of advice that would have prevented it.
+- `SettingsPanel` — volumes, a three-step graphics preset, and a touch-control
+  override. Shared between title and pause rather than duplicated.
+- `Main` rewritten as a scene router. Restarting rebuilds only the level, so the
+  music and ambience stay continuous across attempts — retrying is the main verb in
+  this game and restarting the soundtrack every time was intolerable.
+- `scripts/ui_sheet.sh` — renders every screen at four viewport sizes and fails on
+  geometry problems.
+
+### Fixed
+
+- **Results told the player to "press R", which does not exist on a phone.** Replaced
+  with real buttons that work for keyboard, pointer and touch, plus a short arming
+  delay so a death mid-jump-mash does not skip the screen.
+- **Touch controls were drawn over every menu**, and their invisible padded hit areas
+  sat on top of menu buttons and swallowed taps meant for them.
+- **Godot synthesises mouse events from touches**, so treating mouse input as "a real
+  mouse is in use" made the controls hide the instant they were touched. Mouse events
+  within 900 ms of a genuine touch are now ignored.
+- **The controls panel was several screens tall.** A wrapping label inside a row with
+  no width allocation collapsed to one character per line, and the panel's own Back
+  button ended up off the bottom of the display — a dead end with no way back.
+- **Arrow glyphs rendered as missing-character boxes** in the default font, so the
+  controls list was partly unreadable. Now plain ASCII.
+- **Menu text was 4–8 physical pixels on a phone.** `canvas_items` stretch guarantees
+  nothing overflows and quietly guarantees nothing is legible either: measured across
+  four viewports, a 14 px label rendered at 14 px on desktop, 7.6 px on a landscape
+  phone and 4.3 px in portrait. An adaptive `content_scale_factor` now holds the
+  smallest text at 11 px everywhere, leaving desktop untouched.
+- Launch flags are read once into a cached query string and logged, because a flag
+  that silently fails to parse is indistinguishable from a broken feature.
+
+### A measurement worth recording
+
+The UI harness first reported four panels "overflowing" their screens. They were not:
+it was comparing layout units against window pixels, and under `canvas_items` stretch
+those are different things. Fixing the *test* revealed the real defect underneath —
+legibility, not overflow — which no amount of staring at screenshots had surfaced.
+
+### Verified
+
+- Autopilot: 244 m in 23.13 s, every state exercised, chase gap 5.1–21.5 m.
+- Stall test: caught in 2.1 s.
+- 20 UI screens across four viewports, none overflowing, smallest text ≥ 11 px.
+- Browser build clean; all 5 phone/tablet touch profiles pass.
+
 ## Demo 0.6 — visual polish + recovery drill — 2026-09-22
 
 ### Added

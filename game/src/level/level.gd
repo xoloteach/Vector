@@ -46,8 +46,12 @@ const PROP_BACK_Z: float = -1.9
 @export var camera: ParkourCamera
 @export var spawn_point: Marker3D
 
-## Whether this level runs a chase. Off for test courses.
+## Whether this level runs a chase. Off for test courses and the title backdrop.
 @export var chase_enabled: bool = true
+
+## Attract mode: the level renders as a backdrop for the title screen, with the runner
+## inert. Set before the level enters the tree.
+var attract_mode: bool = false
 
 var director: ChaseDirector
 var pursuer: Pursuer
@@ -88,10 +92,21 @@ func _ready() -> void:
 		camera.snap_to_target()
 
 	course_built.emit(course_length)
+
+	if attract_mode:
+		# Frozen scenery for the title screen: the runner stands still and the run
+		# clock never starts, so the title cannot accrue a time or a death.
+		if player != null:
+			player.controls_disabled = true
+		return
+
 	Game.start_run()
 
 
 ## Restart and pause are **polled**, not handled as events.
+##
+## Disabled in attract mode: the title screen owns the keyboard there, and a stray R
+## or Esc must not restart or pause a level the player has not started.
 ##
 ## The on-screen touch controls drive the game through `Input.action_press()`,
 ## which sets an action's state but does not synthesise an `InputEvent`. Anything
@@ -99,6 +114,8 @@ func _ready() -> void:
 ## invisible to touch. Polling `Input.is_action_just_pressed()` sees keyboard,
 ## gamepad and touch identically, so there is one code path for all of them.
 func _process(_delta: float) -> void:
+	if attract_mode:
+		return
 	if Input.is_action_just_pressed(&"restart"):
 		Game.restart_level()
 	elif Input.is_action_just_pressed(&"pause"):

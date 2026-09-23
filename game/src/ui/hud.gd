@@ -186,6 +186,9 @@ func _make_bar(fill: Color) -> ProgressBar:
 
 
 func _build_banner() -> void:
+	# The HUD no longer draws an end-of-run banner. `ResultsPanel` owns that, because
+	# a banner saying "press R" is unusable on a touch device and the outcome screen
+	# needs real buttons.
 	_banner = PanelContainer.new()
 	_banner.set_anchors_preset(Control.PRESET_CENTER)
 	# Sits slightly above centre so the runner's body stays visible underneath it.
@@ -363,9 +366,12 @@ func _on_run_completed(elapsed: float) -> void:
 
 
 func _show_banner(title: String, hint: String) -> void:
+	# Intentionally inert. `ResultsPanel` presents outcomes now, with real buttons that
+	# work on touch. The builders are kept because the debug overlay still reuses the
+	# styling, but the banner must never appear alongside the results panel.
 	_banner_title.text = title
 	_banner_hint.text = hint
-	_banner.visible = true
+	_banner.visible = false
 
 
 func _fail_title(reason: String) -> String:
