@@ -272,7 +272,9 @@ func _update_rotate_hint() -> void:
 func _build_debug() -> void:
 	_state_label = Label.new()
 	_state_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	_state_label.position = Vector2(-320, MARGIN)
+	# Pushed below the top-right corner, which the touch controls' pause and restart
+	# buttons occupy. The overlay was rendering straight through them.
+	_state_label.position = Vector2(-320, MARGIN + 96)
 	_state_label.custom_minimum_size = Vector2(300, 0)
 	_state_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_state_label.add_theme_font_size_override("font_size", 13)

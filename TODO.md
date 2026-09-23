@@ -24,24 +24,20 @@ anything new — its ranked table is the work queue.
 | 9 · Demo 0.7 — synthesised audio | done |
 | 10 · UI and game flow | done |
 | 11 · Browser export reliability | done |
-| 12 · Pages workflow | done (deployment blocked — see below) |
+| 12 · Pages workflow | done — **live and verified in production** |
 | — · Touch controls | done |
 | — · Level extended to 2–4 min playtime | done |
 
 ## Blockers
 
-**GitHub Pages is not enabled on the repository.** The workflow validates, runs the
-gameplay tests, exports and uploads the artifact correctly, but `actions/deploy-pages`
-returns 404 because Pages has never been turned on. This cannot be done from a
-workflow, and the REST call needs admin (`POST /repos/.../pages` returns 403).
+None. **Deployment is live and verified: https://xoloteach.github.io/Vector/**
 
-*One-time manual step:* **Settings → Pages → Build and deployment → Source → GitHub
-Actions**, then re-run the workflow. **No code changes are needed.**
+The deployed build was played in real Chromium against the public URL — all assets
+serve 200, WASM is gzipped 39 MB to 10.2 MB, no worker script (confirming the
+no-threads build static hosting needs), and zero page errors or failed requests.
 
-Until then the playable build is available two other ways: the `roofline-web-build`
-artifact on any successful run, and the committed copy in `exports/web/` (serve over
-HTTP, not `file://`). The deploy step is `continue-on-error` so this settings issue
-cannot mask real regressions — the build job still fails hard on those.
+The deploy step remains `continue-on-error` deliberately: if Pages is ever disabled
+again, that must not mask a real regression. The build job still fails hard on those.
 
 ## Open work, in priority order
 

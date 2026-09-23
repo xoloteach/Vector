@@ -200,6 +200,10 @@ func _ready() -> void:
 
 	get_viewport().size_changed.connect(_layout)
 	set_enabled(_should_start_enabled())
+	# Applied unconditionally. `set_enabled` early-returns when the value has not
+	# changed, and the root Control defaults to visible — so starting *disabled* left
+	# the controls drawn but inert, which is worse than either showing or hiding them.
+	_refresh_visibility()
 
 
 ## True when the platform reports a touchscreen.

@@ -20,7 +20,7 @@ something is behind you.
 
 | Where | Link |
 | --- | --- |
-| Browser (GitHub Pages) | https://xoloteach.github.io/Vector/ — *requires Pages to be enabled once; see [`TODO.md`](TODO.md)* |
+| **Browser (play now)** | **https://xoloteach.github.io/Vector/** |
 | CI artifact | `roofline-web-build` on any successful Actions run |
 | Local export | `exports/web/index.html` (serve over HTTP, see below) |
 

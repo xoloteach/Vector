@@ -5,6 +5,69 @@ All notable progress, recorded per playable demo. Newest first.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 Every entry corresponds to a commit on `main` that produced a working build.
 
+## 1.0 — deployed and verified live — 2026-09-23
+
+GitHub Pages is enabled and the game is live at
+**https://xoloteach.github.io/Vector/**
+
+### Verified in production
+
+The deployed build was played in real Chromium against the public URL, not against a
+local server:
+
+- `index.html`, `index.js`, `index.pck` and `index.wasm` all serve 200.
+- WASM is 39 MB uncompressed, **10.2 MB over the wire** — Pages gzip is working.
+- No `index.worker.js`, confirming the no-threads build that static hosting requires.
+- **Zero page errors and zero failed requests.**
+- The autopilot drove the live build through the course; the debug overlay confirmed
+  full speed (11.5 m/s) and correct state transitions in production.
+- Both CI jobs green: *Validate, test and export* and *Publish to Pages*.
+
+### Fixed
+
+- **Touch controls rendered even when explicitly disabled.** `set_enabled` early-returns
+  when the value has not changed, and the root Control defaults to visible — so
+  starting *disabled* left the controls drawn but inert, which is worse than either
+  showing or hiding them. Visibility is now applied unconditionally on setup.
+- Debug overlay rendered straight through the pause and restart buttons in the
+  top-right corner.
+
+### Level
+
+Extended from 244 m to **640 m** across three acts — teaching, rhythm, pressure. A
+clean autopilot run is 60 s, putting a learning player in the 2–4 minute target.
+
+Act II asks for execution at pace: a four-obstacle vault chain spaced at 7 m (just
+enough to re-accelerate after a high vault's speed cost), a staggered mantle-and-gap
+ascent that alternates move types so neither becomes automatic, a duct run where the
+transitions are the difficulty rather than any single move, and a three-stage descent
+ending above the roll threshold. Act III is the difficulty peak — a no-recovery
+vault-gap-mantle sequence and back-to-back wall runs reachable only with speed intact —
+followed by a sprint home the player wins, because a level should not end on one last
+chance to fail.
+
+### Fixed in the extension
+
+- **The void kill-zone was hardcoded at y = -18**, from when the lowest deck was -6.
+  Adding a descent to -16 put the final deck inside the kill volume, so landing
+  correctly on it killed the player. It is now derived from the lowest surface the
+  course actually builds, and the movement profile's kill plane is a pure backstop.
+
+### Measured
+
+Render cost across the whole 640 m level, from `./scripts/shots.sh`:
+
+| Metric | Peak |
+| --- | --- |
+| Draw calls | **51** |
+| Primitives | **7,544** |
+
+Reported instead of frame rate because these are hardware-independent — a
+software-rendered frame rate says nothing about a real device. Frame rate on real GPU
+hardware remains the one unmeasured claim, and is the top item in `TODO.md`.
+
+Full review: `docs/reviews/final-review.md`.
+
 ## Demo 0.7 — audio, title screen, game flow — 2026-09-22
 
 The game now has a front door, a pause menu, a results screen, and sound.
