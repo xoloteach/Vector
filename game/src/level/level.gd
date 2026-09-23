@@ -51,6 +51,7 @@ const PROP_BACK_Z: float = -1.9
 
 var director: ChaseDirector
 var pursuer: Pursuer
+var fx: RunnerFX
 
 ## X position of the finish line, filled in by `build_course()`.
 var course_length: float = 0.0
@@ -68,6 +69,10 @@ func _ready() -> void:
 	if camera == null:
 		camera = get_viewport().get_camera_3d() as ParkourCamera
 
+	fx = RunnerFX.new()
+	fx.name = "RunnerFX"
+	add_child(fx)
+
 	build_course()
 	_add_void_killzone()
 
@@ -75,6 +80,7 @@ func _ready() -> void:
 		if spawn_point != null:
 			player.global_position = spawn_point.global_position
 		player.died.connect(_on_player_died)
+		fx.setup(player)
 		if chase_enabled:
 			_start_chase()
 
@@ -162,6 +168,10 @@ func deck(
 		(SURFACE_FRONT_Z + SURFACE_BACK_Z) * 0.5
 	)
 	var body: BoxBlock = block(centre, Vector3(width, thickness, depth), kind)
+	# Decks do not cast. They are far too wide for the shadow atlas to resolve and
+	# self-shadow their own front faces into a visible diagonal weave. They still
+	# receive, so the runner and props are grounded normally.
+	body.casts_shadow = false
 	if thickness > 1.4:
 		_add_face_seams(from_x, to_x, top_y, thickness)
 	return body

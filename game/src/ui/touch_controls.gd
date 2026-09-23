@@ -195,13 +195,46 @@ func _ready() -> void:
 	set_enabled(_should_start_enabled())
 
 
-## True when the platform reports a touchscreen. Not trusted as the only signal —
-## browsers on hybrid laptops report inconsistently — so `_input` also reveals the
-## controls on the first genuine touch.
+## True when the platform reports a touchscreen.
+##
+## Deliberately optimistic, and paired with the mouse check in `_input`. Browsers
+## report touch capability inconsistently — a desktop Chromium claims a touchscreen
+## is available, which put a full thumb UI over the game on a machine that has no
+## touchscreen at all. Rather than guess harder up front, the controls appear when
+## touch is *plausible* and retreat the moment a mouse or keyboard is actually used.
+## Guessing wrong in this direction is recoverable in one mouse movement; guessing
+## wrong the other way leaves a tablet player with no controls at all.
 func _should_start_enabled() -> bool:
-	if DisplayServer.is_touchscreen_available():
+	match Game.touch_mode:
+		Game.TouchMode.ALWAYS:
+			return true
+		Game.TouchMode.NEVER:
+			return false
+		_:
+			pass
+
+	if OS.has_feature("mobile") or OS.has_feature("android") or OS.has_feature("ios"):
 		return true
-	return OS.has_feature("mobile") or OS.has_feature("android") or OS.has_feature("ios")
+	if OS.has_feature("web"):
+		return _browser_is_mobile()
+	return DisplayServer.is_touchscreen_available()
+
+
+## User-agent check, used only on web.
+##
+## `DisplayServer.is_touchscreen_available()` is not usable as the primary signal in
+## a browser — desktop Chromium answers yes. The user agent is the conventional
+## answer to "is this a phone or tablet" on the web precisely because capability
+## detection does not distinguish a touchscreen laptop from a tablet.
+func _browser_is_mobile() -> bool:
+	var agent: Variant = JavaScriptBridge.eval("navigator.userAgent", true)
+	if typeof(agent) != TYPE_STRING:
+		return false
+	var text: String = String(agent).to_lower()
+	for token: String in ["android", "iphone", "ipad", "ipod", "mobile", "silk", "kindle"]:
+		if text.contains(token):
+			return true
+	return false
 
 
 func set_enabled(value: bool) -> void:
@@ -326,8 +359,15 @@ func _input(event: InputEvent) -> void:
 		var touch: InputEventScreenTouch = event
 		# First real touch reveals the controls, covering platforms whose feature
 		# detection claims there is no touchscreen.
-		if not _enabled:
+		#
+		# Only in AUTO. An explicit NEVER has to win, and this is exactly where it
+		# failed to: desktop Chromium delivers *mouse clicks* as screen-touch events
+		# when it reports touch capability, so a single click re-enabled a UI the
+		# player had switched off.
+		if not _enabled and Game.touch_mode == Game.TouchMode.AUTO:
 			set_enabled(true)
+		elif not _enabled:
+			return
 		if touch.pressed:
 			_begin_touch(touch.index, touch.position)
 		else:
@@ -340,9 +380,17 @@ func _input(event: InputEvent) -> void:
 		_move_touch(drag.index, drag.position)
 		return
 
-	# Real keyboard use means this is not a touch session; get the thumb UI out of
-	# the way. Joypad input counts too.
-	if _enabled and (event is InputEventKey or event is InputEventJoypadButton):
+	# Real keyboard, mouse or gamepad use means this is not a touch session; get the
+	# thumb UI out of the way.
+	#
+	# Mouse *motion* is included because it is the only reliable signal that a
+	# desktop browser's claim of touch capability was wrong. Emulated touch-from-mouse
+	# is off, so a genuine motion event cannot have come from a finger.
+	if not _enabled:
+		return
+	if event is InputEventMouseMotion:
+		set_enabled(false)
+	elif event is InputEventKey or event is InputEventJoypadButton or event is InputEventMouseButton:
 		if event.is_pressed():
 			set_enabled(false)
 

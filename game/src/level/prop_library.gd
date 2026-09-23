@@ -53,7 +53,7 @@ const MINIMUM_SCENERY_FADE: float = 0.3
 const FOREGROUND_DEPTH: float = 0.75
 
 ## Colour distant geometry converges on. Matches `SkylineBackdrop.HAZE`.
-const HAZE: Color = Color(0.29, 0.28, 0.335)
+const HAZE: Color = Color(0.205, 0.198, 0.245)
 
 static var _scene_cache: Dictionary[String, PackedScene] = {}
 ## Material cache keyed by "kind:depth_bucket", so a hundred props at the same

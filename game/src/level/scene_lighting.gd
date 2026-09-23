@@ -37,11 +37,18 @@ extends Node3D
 	set(value):
 		key_yaw = value
 		_rebuild()
-@export var key_color: Color = Color(1.0, 0.86, 0.68):
+@export var key_color: Color = Color(1.0, 0.8, 0.58):
 	set(value):
 		key_color = value
 		_rebuild()
-@export var key_energy: float = 1.3:
+## Raised, and paired with reduced ambient in the environment.
+##
+## The scene rendered almost monochrome blue: a warm key at 1.3 against a strong
+## blue ambient meant ambient won everywhere, so lit and unlit surfaces differed in
+## brightness but not in hue. Pushing the key up and the ambient down restores a
+## warm/cool split — sunlit faces warm, shadowed faces cool — which is what makes a
+## limited palette look deliberate instead of desaturated.
+@export var key_energy: float = 1.42:
 	set(value):
 		key_energy = value
 		_rebuild()
@@ -72,15 +79,25 @@ extends Node3D
 		_rebuild()
 
 @export_group("Shadows")
-@export var shadow_max_distance: float = 80.0:
+## Kept tight on purpose.
+##
+## The camera only ever shows about 15 m of width, so a long shadow range spends the
+## atlas on geometry nobody can see. At 80 m the effective resolution over a 28 m deck
+## was low enough to produce visible diagonal self-shadowing acne across its whole
+## front face — a repeating hatch pattern on the single largest flat surface in frame.
+## Shortening the range raises texel density where it is actually needed.
+@export var shadow_max_distance: float = 42.0:
 	set(value):
 		shadow_max_distance = value
 		_rebuild()
-@export var shadow_bias: float = 0.03:
+## Depth and normal bias, raised together to kill the remaining acne on surfaces the
+## light grazes. Large flat faces at a shallow incidence angle are the worst case, and
+## this scene is made of them.
+@export var shadow_bias: float = 0.055:
 	set(value):
 		shadow_bias = value
 		_rebuild()
-@export var shadow_normal_bias: float = 1.2:
+@export var shadow_normal_bias: float = 2.4:
 	set(value):
 		shadow_normal_bias = value
 		_rebuild()

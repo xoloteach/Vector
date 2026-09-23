@@ -46,6 +46,13 @@ extends StaticBody3D
 		traversable = value
 		_rebuild()
 
+## Whether this block casts shadows. Turned off for large structural decks — see
+## the note in `_rebuild()`.
+@export var casts_shadow: bool = true:
+	set(value):
+		casts_shadow = value
+		_rebuild()
+
 var _mesh_instance: MeshInstance3D
 var _collision: CollisionShape3D
 
@@ -75,16 +82,21 @@ func _rebuild() -> void:
 	collision_layer = (4 if traversable else 1) if solid else 0
 	collision_mask = 0  # static geometry never needs to detect anything
 
-	# Decoration never casts shadows.
+	# Shadow casting is opt-out, for two different reasons.
 	#
-	# Two reasons, and the first is not performance. Decorative blocks are thin
-	# plates sitting a few centimetres off the surfaces they trim, so at a grazing
-	# sun angle they throw jagged, shadow-map-aliased sawtooth edges across the
-	# geometry right where the player is trying to read a deck edge. They are
-	# readability aids; letting them damage readability defeats the point. The
-	# saved shadow-atlas work is a bonus.
+	# **Decoration** never casts. Decorative blocks are thin plates sitting a few
+	# centimetres off the surfaces they trim, so at a grazing sun angle they throw
+	# jagged, shadow-map-aliased sawtooth edges across the geometry right where the
+	# player is reading a deck edge. They are readability aids; letting them damage
+	# readability defeats the point.
+	#
+	# **Large structural blocks** opt out via `casts_shadow`. A 28 m deck is wide
+	# enough that the shadow atlas cannot resolve it, and it self-shadows its own
+	# front face into a visible diagonal weave — on the largest flat surface in the
+	# frame. Receiving is unaffected, so the runner and the props still cast onto the
+	# deck, which is where grounding shadows actually matter.
 	_mesh_instance.cast_shadow = (
-		GeometryInstance3D.SHADOW_CASTING_SETTING_ON if solid
+		GeometryInstance3D.SHADOW_CASTING_SETTING_ON if (solid and casts_shadow)
 		else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	)
 

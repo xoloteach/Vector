@@ -94,7 +94,7 @@ async function main() {
   });
 
   // `?bot=1` makes the build play itself. See FRAME_COUNT above for why.
-  const target = URL.includes('?') ? `${URL}&bot=1` : `${URL}/?bot=1`;
+  const target = URL.includes('?') ? `${URL}&bot=1&touch=0` : `${URL}/?bot=1&touch=0`;
   log(`opening ${target}`);
   await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 60000 });
 

@@ -79,11 +79,54 @@ ffmpeg -version
 ls ~/.local/share/godot/export_templates/4.7.2.stable/web_nothreads_release.zip
 ```
 
+## Recovering after a sandbox reset
+
+This has actually happened, mid-project, and the recovery took about five
+minutes. Notes from doing it:
+
+**What survives:** everything under `/projects` — the whole repository including
+uncommitted work. The persistent volume outlived a complete tool wipe.
+
+**What disappears:** `/opt` and `/usr/local/bin`. Every symlink to `godot`,
+`blender`, `node`, `chromium` and `ffmpeg` goes with them, and so do the Godot
+export templates under `~/.local/share/godot/`.
+
+**What is often still there, just unreachable:** Node and the Playwright browser
+bundle. Check before re-downloading:
+
+```bash
+ls /root/.nvm/versions/node     # node is usually still installed
+ls /opt/playwright              # chromium + ffmpeg bundles often survive
+```
+
+If present, relinking is all that is needed:
+
+```bash
+NODE_DIR=/root/.nvm/versions/node/v22.23.2/bin
+ln -sf $NODE_DIR/node /usr/local/bin/node
+ln -sf $NODE_DIR/npm  /usr/local/bin/npm
+ln -sf $NODE_DIR/npx  /usr/local/bin/npx
+ln -sf /opt/playwright/chromium-*/chrome-linux64/chrome /usr/local/bin/chromium
+ln -sf /opt/playwright/ffmpeg-*/ffmpeg-linux /usr/local/bin/ffmpeg
+```
+
+Godot, its export templates, and Blender do have to be re-downloaded. Run the
+three blocks in the section above, then confirm with:
+
+```bash
+./scripts/validate.sh && ./scripts/test_headless.sh
+```
+
+If both pass, the recovery is complete — those two cover imports, script
+parsing, scene boot, level completability and chase fairness.
+
 ## Gotchas found the hard way
 
 - `npx playwright install --with-deps` fails on Amazon Linux — it shells out to
   `apt-get`. Install the system libraries with `dnf` first, then run
   `playwright install chromium` without `--with-deps`.
+- Node exists but is not on `PATH` after a reset; it lives under nvm. The dev
+  scripts call `node` directly, so it needs a symlink.
 - `tar xf *.tar.xz` fails until `xz` is installed; the error is the misleading
   `xz: Cannot exec`.
 - Blender fails with `libGL.so.1: cannot open shared object file` even in

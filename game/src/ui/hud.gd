@@ -90,11 +90,17 @@ func _build_top_left() -> void:
 
 
 func _build_bottom() -> void:
-	# Bottom-left: speed. Bottom edge keeps it clear of the action band, and the
-	# left side means it sits *behind* the runner in reading order.
+	# Speed and route sit **top-left, directly under the timer** — permanently.
+	#
+	# They started in the bottom-left corner, which meant they had to move out of the
+	# way whenever the touch controls appeared. That conditional layout was wrong in
+	# practice and resisted two attempts to fix it, so it is gone: a single position
+	# that is always correct beats a clever one that is sometimes correct. Stacked
+	# under the timer they read as one information column, which is arguably better
+	# than the original anyway, and nothing can ever end up under a thumb.
 	var box := VBoxContainer.new()
-	box.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	box.position = Vector2(MARGIN, -76)
+	box.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	box.position = Vector2(MARGIN, MARGIN + 62)
 	box.custom_minimum_size = Vector2(190, 0)
 	box.add_theme_constant_override("separation", 3)
 	add_child(box)
@@ -323,22 +329,15 @@ func _check_debug_toggle() -> void:
 		_state_label.visible = _debug_visible
 
 
-## Relayouts for touch play.
+## Notes whether the on-screen controls are showing.
 ##
-## The speed and route meters live in the bottom-left corner, which is exactly
-## where the left thumb cluster goes. Rather than shrink the controls or overlap
-## them, the meters move up under the timer — still out of the centre action band,
-## still in peripheral vision, and now nothing is under a thumb.
+## No longer moves anything — the meters live permanently top-left, clear of both
+## thumbs. Retained because the rotate hint should only appear on a device that can
+## actually be rotated.
 func set_touch_mode(active: bool) -> void:
 	if _touch_mode == active:
 		return
 	_touch_mode = active
-	if active:
-		_meters.set_anchors_preset(Control.PRESET_TOP_LEFT)
-		_meters.position = Vector2(MARGIN, MARGIN + 74)
-	else:
-		_meters.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-		_meters.position = Vector2(MARGIN, -76)
 	_update_rotate_hint()
 
 

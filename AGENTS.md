@@ -87,8 +87,17 @@ Iterate with the first, verify with the second.
 - Touch is a supported platform. Any new action needs an on-screen control in
   `src/ui/touch_controls.gd`, and buttons must *hold* their action rather than
   pulse it, or variable jump height and sustained slides break.
-- Anything the HUD draws in a screen corner must move out of the way when touch
-  controls appear (`HUD.set_touch_mode`).
+- **The HUD never occupies a thumb corner.** Meters live permanently top-left
+  under the timer. An earlier design moved them out of the way when the touch
+  controls appeared; that conditional layout was wrong in practice and resisted
+  two fixes, so it was deleted. One position that is always correct beats a
+  clever one that is sometimes correct.
+- **Browser touch detection is unreliable and must not be trusted alone.**
+  Desktop Chromium reports a touchscreen as available *and* delivers mouse
+  clicks as `InputEventScreenTouch`. Detection uses the user agent on web,
+  retreats on real mouse/keyboard input, and is overridable via
+  `Game.touch_mode` (`?touch=0` / `?touch=1` in the URL). Any auto-reveal path
+  must respect an explicit override — that is exactly where it broke before.
 
 ## 6. Testing philosophy
 

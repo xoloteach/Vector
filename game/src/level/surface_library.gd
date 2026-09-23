@@ -49,7 +49,10 @@ static func _build(kind: Kind) -> StandardMaterial3D:
 			# value range. Set against `scripts/analyse_frame.py` readings: an
 			# earlier value of 0.185 measured *darker* than the backdrop behind it,
 			# which flattened the whole composition.
-			mat.albedo_color = Color(0.3, 0.325, 0.37)
+			# Very slightly warm rather than blue-grey. The whole scene was reading
+			# monochrome; giving the largest surface a faint warm bias means the cool
+			# ambient in the shadows has something to contrast against.
+			mat.albedo_color = Color(0.3, 0.3, 0.32)
 			mat.roughness = 0.88
 			mat.metallic = 0.0
 		Kind.METAL:

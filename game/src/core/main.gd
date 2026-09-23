@@ -20,11 +20,14 @@ const AUTOPILOT_FLAG: String = "bot"
 
 var _level: Level
 var _hud: HUD
+var _speed_overlay: SpeedOverlay
 var _touch: TouchControls
 var _bot: Autopilot
 
 
 func _ready() -> void:
+	# Overrides first: the level and UI read settings as they build.
+	_apply_launch_overrides()
 	_load_level(Game.current_level_path)
 
 
@@ -48,6 +51,13 @@ func _load_level(path: String) -> void:
 
 	# Added after the HUD so touch controls sit on top of it. They reveal
 	# themselves only on a touch device or after a real touch event.
+	# Motion streaks and the threat vignette. Added before the touch controls so it
+	# sits beneath them, and beneath the HUD.
+	_speed_overlay = SpeedOverlay.new()
+	_speed_overlay.name = "SpeedOverlay"
+	add_child(_speed_overlay)
+	_speed_overlay.setup(_level.player, _level.director)
+
 	_touch = TouchControls.new()
 	_touch.name = "TouchControls"
 	add_child(_touch)
@@ -58,6 +68,26 @@ func _load_level(path: String) -> void:
 
 	if _autopilot_requested():
 		_attach_autopilot()
+
+
+## Reads settings overrides from the URL query on web, or the command line.
+##
+## `?touch=0` / `?touch=1` force the on-screen controls off or on. These exist
+## because browser touch detection is unreliable, and because deterministic captures
+## need to be able to pin the UI state.
+func _apply_launch_overrides() -> void:
+	var query: String = ""
+	if OS.has_feature("web"):
+		var raw: Variant = JavaScriptBridge.eval("window.location.search", true)
+		if typeof(raw) == TYPE_STRING:
+			query = String(raw)
+	for arg: String in OS.get_cmdline_user_args():
+		query += "&" + arg.trim_prefix("--")
+
+	if query.contains("touch=0"):
+		Game.touch_mode = Game.TouchMode.NEVER
+	elif query.contains("touch=1"):
+		Game.touch_mode = Game.TouchMode.ALWAYS
 
 
 func _attach_autopilot() -> void:

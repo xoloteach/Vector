@@ -6,11 +6,11 @@
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="p_player"]
 
 [sub_resource type="ProceduralSkyMaterial" id="sky_mat"]
-sky_top_color = Color(0.09, 0.13, 0.24, 1)
-sky_horizon_color = Color(0.38, 0.32, 0.36, 1)
-sky_curve = 0.18
-ground_bottom_color = Color(0.05, 0.06, 0.09, 1)
-ground_horizon_color = Color(0.3, 0.26, 0.3, 1)
+sky_top_color = Color(0.075, 0.105, 0.2, 1)
+sky_horizon_color = Color(0.4, 0.3, 0.27, 1)
+sky_curve = 0.13
+ground_bottom_color = Color(0.05, 0.055, 0.08, 1)
+ground_horizon_color = Color(0.33, 0.25, 0.23, 1)
 sun_angle_max = 24.0
 sun_curve = 0.12
 
@@ -21,9 +21,9 @@ sky_material = SubResource("sky_mat")
 background_mode = 2
 sky = SubResource("sky")
 ambient_light_source = 3
-ambient_light_color = Color(0.34, 0.41, 0.56, 1)
-ambient_light_sky_contribution = 0.55
-ambient_light_energy = 0.55
+ambient_light_color = Color(0.3, 0.38, 0.55, 1)
+ambient_light_sky_contribution = 0.4
+ambient_light_energy = 0.34
 tonemap_mode = 3
 tonemap_white = 3.0
 glow_enabled = true
@@ -33,10 +33,10 @@ glow_bloom = 0.06
 glow_blend_mode = 1
 glow_hdr_threshold = 1.05
 fog_enabled = true
-fog_light_color = Color(0.26, 0.31, 0.42, 1)
+fog_light_color = Color(0.3, 0.3, 0.38, 1)
 fog_light_energy = 1.0
-fog_sun_scatter = 0.22
-fog_density = 0.0075
+fog_sun_scatter = 0.45
+fog_density = 0.011
 fog_sky_affect = 0.35
 fog_height = -20.0
 fog_height_density = 0.015

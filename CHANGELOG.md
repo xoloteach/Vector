@@ -5,6 +5,73 @@ All notable progress, recorded per playable demo. Newest first.
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 Every entry corresponds to a commit on `main` that produced a working build.
 
+## Demo 0.6 — visual polish + recovery drill — 2026-09-22
+
+### Added
+
+- `RunnerFX` — landing dust, slide grit, vault puffs, wall scuff. Every effect
+  answers a gameplay question rather than decorating: landing dust scales with
+  impact speed so the *world* reports how expensive a drop was; slide grit marks
+  the contact point, which the pose alone cannot show; vault and scuff puffs
+  confirm the runner actually touched the thing. `CPUParticles3D`, because the
+  target is WebGL2 and the counts are a dozen quads.
+- `SpeedOverlay` — motion streaks and a chase vignette. A side-scroller's speed is
+  genuinely hard to perceive: the runner stays put on screen and the only cue is
+  scenery sliding past, which is weak once the backdrop is deliberately
+  low-contrast. Streaks supply the missing cue and **avoid the vertical band the
+  player reads obstacles in** — the reason they are hand-drawn lines rather than
+  particles.
+- `Game.touch_mode` (AUTO / ALWAYS / NEVER) with `?touch=0` / `?touch=1` URL
+  overrides, plus volume settings ready for audio.
+- Occipital mass on the head, so the skull has a direction in silhouette.
+
+### Fixed
+
+Most of these came from looking at a real screenshot of the running game:
+
+- **The head read as a top hat.** It was 0.20 m front-to-back and 0.24 m tall,
+  which from the side is a tall narrow box. Heads are about as deep as they are
+  tall; the profile is now stretched forward instead of squashed.
+- **The arms were invisible.** They hang directly in front of the torso in a side
+  view and were the same value as it, so the figure read as a block with legs and
+  no arm-swing was visible at all despite being fully animated. One value step
+  fixed it.
+- **The scene was almost monochrome blue.** A warm key at 1.3 against a strong blue
+  ambient meant ambient won everywhere, so lit and unlit surfaces differed in
+  brightness but not hue. Key up, ambient down, and a faint warm bias on the
+  largest surface — now there is a real warm/cool split.
+- **A diagonal weave pattern across the largest flat surface in every frame.**
+  Shadow acne: a 28 m deck is too wide for the atlas to resolve and was
+  self-shadowing its own front face. Bias tuning did not fix it; A/B-ing shadows
+  off identified it, and the fix is that decks no longer *cast*. They still
+  receive, so the runner and props stay grounded.
+- Shadow range cut from 80 m to 42 m — the camera never shows more than ~15 m, so
+  the rest of the atlas was spent on geometry nobody can see.
+- **HUD meters never moved out of the thumb corner.** The conditional layout was
+  wrong in practice and resisted two fixes, so it is gone: the meters live
+  permanently top-left under the timer. One position that is always correct beats a
+  clever one that is sometimes correct.
+- **Touch controls appeared on desktop.** Chromium reports a touchscreen as
+  available *and* delivers mouse clicks as `InputEventScreenTouch`, so a single
+  click both looked like touch and re-enabled a UI that had been explicitly turned
+  off. Detection now uses the user agent on web, retreats on real mouse or keyboard
+  input, and any auto-reveal path respects an explicit override.
+
+### Recovery drill
+
+The build sandbox was wiped mid-project — every tool in `/opt` and
+`/usr/local/bin` gone, along with the Godot export templates. Everything under
+`/projects` survived, including uncommitted work. Recovery took about five minutes
+following `docs/ENVIRONMENT.md`, which has been updated with what the drill
+actually taught:
+
+- Node and the Playwright browser bundle usually survive and only need relinking —
+  check before re-downloading.
+- Godot, its templates and Blender do have to be refetched.
+- `./scripts/validate.sh && ./scripts/test_headless.sh` is a sufficient
+  all-clear: between them they cover imports, script parsing, scene boot, level
+  completability and chase fairness.
+
 ## Demo 0.5 — chase system — 2026-09-22
 
 Something is behind you now.

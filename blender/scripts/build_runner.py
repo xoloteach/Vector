@@ -238,11 +238,23 @@ def build_body(builder: MeshBuilder, mat: dict[str, int]) -> None:
     neck_top = Vector((0.0, 0.0, spec.NECK_Y))
     tube(builder, shoulders, neck_top, spec.R_NECK * 1.2, spec.R_NECK, "Neck", suit,
          parent_bone="Chest")
-    # Head is a squashed tube rather than a sphere: fewer triangles, and a flat
-    # back-of-head silhouette reads more like a hood than a ball.
+    # Head: a tube stretched *forward* rather than squashed.
+    #
+    # Deeper than it is wide, because the side profile is the only view that matters.
+    # The first version was 0.20 m front-to-back and 0.24 m tall, which from the side
+    # is a tall narrow box — on screen it read unmistakably as a top hat.
     tube(builder, neck_top, Vector((0.0, 0.0, spec.HEAD_TOP)),
-         spec.R_HEAD, spec.R_HEAD * 0.82, "Head", suit,
-         parent_bone="Neck", segments=2, squash_x=0.9)
+         spec.R_HEAD, spec.R_HEAD * 0.86, "Head", suit,
+         parent_bone="Neck", segments=2, squash_x=spec.HEAD_DEPTH_SCALE)
+    # Occipital mass at the back of the skull. Gives the head a clear direction in
+    # silhouette, which is what tells the player which way the runner faces when
+    # everything else is a flat dark shape.
+    builder.add_box(
+        Vector((-0.07, 0.0, spec.HEAD_TOP - 0.11)),
+        Vector((0.075, 0.155, 0.125)),
+        suit,
+        {"Head": 1.0},
+    )
 
     # --- accent shoulder yoke ------------------------------------------------
     # The one bright element. It is doing readability work: at 150 px a
@@ -292,7 +304,14 @@ def build_body(builder: MeshBuilder, mat: dict[str, int]) -> None:
             spec.R_UPPER_ARM_TOP,
             spec.R_UPPER_ARM_BOTTOM,
             f"UpperArm{side}",
-            suit,
+            # Arms use the lighter `trim` value, not `suit`.
+            #
+            # They hang directly in front of the torso in a side view, and at the same
+            # value they vanished into it — the figure read as a headless block with
+            # legs, and no arm-swing was visible at all despite being animated. A
+            # single value step is enough to separate them while keeping the whole
+            # figure firmly in silhouette.
+            trim,
             parent_bone=f"Shoulder{side}",
         )
         tube(

@@ -32,7 +32,7 @@ HEIGHT = 1.74
 HIP_Y = 0.94
 CHEST_Y = 1.26
 SHOULDER_Y = 1.45
-NECK_Y = 1.50
+NECK_Y = 1.54
 HEAD_TOP = 1.74
 
 THIGH = 0.46
@@ -55,8 +55,15 @@ SHOULDER_ROOT = 0.055
 R_HIP = 0.135
 R_WAIST = 0.115
 R_CHEST = 0.150
-R_NECK = 0.058
-R_HEAD = 0.098
+R_NECK = 0.062
+## Head radius, and how much deeper than wide it is.
+##
+## `R_HEAD` alone made a head that was 0.20 m front-to-back and 0.24 m tall, which
+## from the side is a *tall narrow box* — on screen it read unmistakably as a top
+## hat rather than a head. Heads are about as deep as they are tall, so the profile
+## is stretched forward and the skull shortened.
+R_HEAD = 0.097
+HEAD_DEPTH_SCALE = 1.2
 
 R_THIGH_TOP = 0.088
 R_THIGH_BOTTOM = 0.070
@@ -151,6 +158,6 @@ def build_skeleton() -> list[tuple[str, tuple, tuple, str | None]]:
 
 MATERIALS = {
     "suit": (0.042, 0.050, 0.068),
-    "trim": (0.082, 0.092, 0.115),
+    "trim": (0.105, 0.115, 0.140),
     "accent": (0.860, 0.460, 0.130),
 }

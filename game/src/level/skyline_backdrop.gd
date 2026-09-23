@@ -44,9 +44,9 @@ extends Node3D
 ##
 ## Nearest layer's mass colour. Still clearly lighter than the runner, so the
 ## silhouette separates, but now well below the play surface.
-const NEAR_MASS: Color = Color(0.072, 0.086, 0.13)
+const NEAR_MASS: Color = Color(0.052, 0.062, 0.098)
 ## Colour distant masses converge to. Tracks the sky horizon.
-const HAZE: Color = Color(0.29, 0.28, 0.335)
+const HAZE: Color = Color(0.205, 0.198, 0.245)
 
 ## Each layer: Z distance, size ranges, spacing, and `depth` — its 0..1 position
 ## along the near→haze ramp.

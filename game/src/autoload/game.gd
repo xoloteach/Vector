@@ -30,6 +30,32 @@ var furthest_x: float = 0.0
 
 var _paused: bool = false
 
+# ------------------------------------------------------------------- settings
+
+## How the on-screen touch controls behave.
+##
+## A real setting rather than pure auto-detection, because detection cannot be made
+## reliable in a browser: desktop Chromium reports a touchscreen as available and
+## delivers mouse clicks as screen-touch events, which put a full thumb UI over the
+## game on a machine with no touchscreen. Auto does its best and retreats on mouse
+## or keyboard use; the explicit modes exist because some player, somewhere, will
+## need them.
+enum TouchMode { AUTO, ALWAYS, NEVER }
+
+var touch_mode: TouchMode = TouchMode.AUTO:
+	set(value):
+		touch_mode = value
+		touch_mode_changed.emit(value)
+
+signal touch_mode_changed(mode: TouchMode)
+
+## Master and bus volumes, 0..1. Applied by the audio system.
+var master_volume: float = 0.85
+var music_volume: float = 0.6
+var sfx_volume: float = 0.9
+
+signal volumes_changed
+
 
 func _ready() -> void:
 	# The pause menu and death screen still need to process while the world is
